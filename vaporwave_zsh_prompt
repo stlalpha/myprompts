@@ -3,8 +3,12 @@
 # Vaporwave Dark Mode Zsh Prompt
 # Mirrors the Bash variant with neon vaporwave colors and Unicode accents.
 
+[[ -n ${ZSH_VERSION-} ]] || return 0
+
 setopt prompt_subst               # Enable \$(...) evaluation during prompt rendering
-autoload -Uz colors && colors      # Load zsh color definitions
+
+autoload -Uz colors add-zsh-hook
+colors                            # Load zsh color definitions
 
 # Prompt formatting helpers (zsh automatically treats these as zero width)
 RESET="%f%k%b"
@@ -31,15 +35,30 @@ prompt_vaporwave_git_branch() {
   printf '『%s』' "$branch"
 }
 
-PROMPT="${BG_DARK}${NEON_PINK}◤${NEON_CYAN}%n${DARK_PURPLE}@${NEON_PURPLE}%m${NEON_PINK}◢%k%f "
-PROMPT+="${SUNSET_ORANGE}【${MINT_GREEN}%~${SUNSET_ORANGE}】${RESET} "
-PROMPT+="${HOT_MAGENTA}\$(prompt_vaporwave_git_branch)${RESET} "
-PROMPT+="${NEON_BLUE}${BOLD}▸${RESET} "
+prompt_vaporwave_render() {
+  PROMPT="${BG_DARK}${NEON_PINK}◤${NEON_CYAN}%n${DARK_PURPLE}@${NEON_PURPLE}%m${NEON_PINK}◢%k%f "
+  PROMPT+="${SUNSET_ORANGE}【${MINT_GREEN}%~${SUNSET_ORANGE}】${RESET} "
+  PROMPT+="${HOT_MAGENTA}\$(prompt_vaporwave_git_branch)${RESET} "
+  PROMPT+="${NEON_BLUE}${BOLD}▸${RESET} "
+  RPROMPT=""
+}
+
+prompt_vaporwave_precmd() {
+  prompt_vaporwave_render
+}
+
+# Ensure we only register the hook once even if sourced repeatedly.
+add-zsh-hook -d precmd prompt_vaporwave_precmd 2>/dev/null || true
+add-zsh-hook precmd prompt_vaporwave_precmd
+prompt_vaporwave_render
 
 # Uncomment the block below for an alternate multi-line prompt aesthetic
-# PROMPT="${DARK_PURPLE}【${NEON_PINK}%n${DARK_PURPLE}】${RESET}"
-# PROMPT+="${NEON_CYAN}◆${RESET}"
-# PROMPT+="${DARK_PURPLE}【${NEON_PURPLE}%m${DARK_PURPLE}】${RESET} "
-# PROMPT+="${MINT_GREEN}➤ ${NEON_BLUE}%~${RESET} "
-# PROMPT+="${HOT_MAGENTA}\$(prompt_vaporwave_git_branch)${RESET}\n"
-# PROMPT+="${SUNSET_ORANGE}╰─▸${RESET} "
+# prompt_vaporwave_render() {
+#   PROMPT="${DARK_PURPLE}【${NEON_PINK}%n${DARK_PURPLE}】${RESET}"
+#   PROMPT+="${NEON_CYAN}◆${RESET}"
+#   PROMPT+="${DARK_PURPLE}【${NEON_PURPLE}%m${DARK_PURPLE}】${RESET} "
+#   PROMPT+="${MINT_GREEN}➤ ${NEON_BLUE}%~${RESET} "
+#   PROMPT+="${HOT_MAGENTA}\$(prompt_vaporwave_git_branch)${RESET}\n"
+#   PROMPT+="${SUNSET_ORANGE}╰─▸${RESET} "
+#   RPROMPT=""
+# }

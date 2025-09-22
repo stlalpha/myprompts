@@ -160,7 +160,8 @@ PREVIEW
 
   local choice
   while true; do
-    if ! read -r -u "$PROMPT_FD" -p "Select prompt variant [1-2]: " choice; then
+    printf 'Select prompt variant [1-2]: ' >&"$PROMPT_FD" || { error "Failed to display prompt variant question."; exit 1; }
+    if ! IFS= read -r -u "$PROMPT_FD" choice; then
       error "Failed to read response; aborting installation."
       exit 1
     fi
@@ -168,7 +169,7 @@ PREVIEW
     case "$choice" in
       1) echo "$PROMPT_STATIC"; return ;;
       2) echo "$PROMPT_LIQUID"; return ;;
-      *) echo "Please enter 1 or 2." ;;
+      *) printf 'Please enter 1 or 2.\n' >&"$PROMPT_FD" ;;
     esac
   done
 }
@@ -206,7 +207,8 @@ PREVIEW
 
   local choice
   while true; do
-    if ! read -r -u "$PROMPT_FD" -p "Select prompt layout [1-2]: " choice; then
+    printf 'Select prompt layout [1-2]: ' >&"$PROMPT_FD" || { error "Failed to display prompt layout question."; exit 1; }
+    if ! IFS= read -r -u "$PROMPT_FD" choice; then
       error "Failed to read response; aborting installation."
       exit 1
     fi
@@ -214,7 +216,7 @@ PREVIEW
     case "$choice" in
       1) echo "compact"; return ;;
       2) echo "extended"; return ;;
-      *) echo "Please enter 1 or 2." ;;
+      *) printf 'Please enter 1 or 2.\n' >&"$PROMPT_FD" ;;
     esac
   done
 }

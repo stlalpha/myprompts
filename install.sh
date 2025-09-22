@@ -129,22 +129,22 @@ prompt_yes_no() {
 }
 
 choose_prompt_variant() {
-  local preset=${PROMPT_VARIANT:-}
-  preset=${preset,,}
-  case "$preset" in
-    liquid|animated)
-      echo "$PROMPT_LIQUID"
-      return
-      ;;
-    classic|static|vaporwave)
-      echo "$PROMPT_STATIC"
-      return
-      ;;
-    "") ;;
-    *) error "Unknown PROMPT_VARIANT '$preset'; expected 'classic' or 'liquid'."; exit 1 ;;
-  esac
-
+  local preset=""
   if (( ! INTERACTIVE )); then
+    preset=${PROMPT_VARIANT:-}
+    preset=${preset,,}
+    case "$preset" in
+      liquid|animated)
+        echo "$PROMPT_LIQUID"
+        return
+        ;;
+      classic|static|vaporwave)
+        echo "$PROMPT_STATIC"
+        return
+        ;;
+      "") ;;
+      *) error "Unknown PROMPT_VARIANT '$preset'; expected 'classic' or 'liquid'."; exit 1 ;;
+    esac
     echo "$PROMPT_STATIC"
     return
   fi
@@ -189,22 +189,22 @@ choose_prompt_variant() {
 }
 
 choose_prompt_style() {
-  local preset=${PROMPT_STYLE:-}
-  preset=${preset,,}
-  case "$preset" in
-    extended|multi-line)
-      echo "extended"
-      return
-      ;;
-    compact|single-line|default)
-      echo "compact"
-      return
-      ;;
-    "") ;;
-    *) error "Unknown PROMPT_STYLE '$preset'; expected 'compact' or 'extended'."; exit 1 ;;
-  esac
-
+  local preset=""
   if (( ! INTERACTIVE )); then
+    preset=${PROMPT_STYLE:-}
+    preset=${preset,,}
+    case "$preset" in
+      extended|multi-line)
+        echo "extended"
+        return
+        ;;
+      compact|single-line|default)
+        echo "compact"
+        return
+        ;;
+      "") ;;
+      *) error "Unknown PROMPT_STYLE '$preset'; expected 'compact' or 'extended'."; exit 1 ;;
+    esac
     echo "compact"
     return
   fi

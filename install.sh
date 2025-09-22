@@ -149,7 +149,7 @@ choose_prompt_variant() {
     return
   fi
 
-  cat <<'PREVIEW'
+  cat >&"$PROMPT_FD" <<'PREVIEW'
 
 Prompt variant options:
   [1] Classic – static vaporwave prompt
@@ -194,7 +194,7 @@ choose_prompt_style() {
     return
   fi
 
-  cat <<'PREVIEW'
+  cat >&"$PROMPT_FD" <<'PREVIEW'
 
 Prompt layout options:
   [1] Compact – single-line prompt

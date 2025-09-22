@@ -65,7 +65,7 @@ prompt_vaporwave_precmd() {
 
 # Ensure we only register the hook once even if sourced repeatedly.
 add-zsh-hook -d precmd prompt_vaporwave_precmd 2>/dev/null || true
-add-zsh-hook precmd prompt_vaporwave_precmd
+add-zsh-hook precmd prompt_vaporwave_precmd >/dev/null 2>&1 || true
 typeset -ga precmd_functions
 precmd_functions=(${(@)precmd_functions:#prompt_vaporwave_precmd} prompt_vaporwave_precmd)
 
@@ -73,10 +73,13 @@ prompt_vaporwave_zle_line_init() {
   prompt_vaporwave_render
 }
 
-add-zsh-hook -d zle-line-init prompt_vaporwave_zle_line_init 2>/dev/null || true
-add-zsh-hook zle-line-init prompt_vaporwave_zle_line_init
-typeset -ga zle_line_init_functions
-zle_line_init_functions=(${(@)zle_line_init_functions:#prompt_vaporwave_zle_line_init} prompt_vaporwave_zle_line_init)
+if add-zsh-hook -d zle-line-init prompt_vaporwave_zle_line_init >/dev/null 2>&1; then
+  :
+fi
+if add-zsh-hook zle-line-init prompt_vaporwave_zle_line_init >/dev/null 2>&1; then
+  typeset -ga zle_line_init_functions
+  zle_line_init_functions=(${(@)zle_line_init_functions:#prompt_vaporwave_zle_line_init} prompt_vaporwave_zle_line_init)
+fi
 
 prompt_vaporwave_render
 

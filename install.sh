@@ -60,8 +60,8 @@ print_header() {
   local bottom="<0Oo............................................................oO0."
 
   printf '%b%s%b\n' "$pink" "$top" "$reset"
-  printf '  %bSpaceman\'s Auto-Personalizer%b %bv0.1b%b\n' "$cyan" "$reset" "$purple" "$reset"
-  printf '  %bBootstrapping vaporwave shell and LS aesthetic...%b\n' "$blue" "$reset"
+  printf "  %bSpaceman's Auto-Personalizer%b %bv0.1b%b\n" "$cyan" "$reset" "$purple" "$reset"
+  printf "  %bBootstrapping vaporwave shell and LS aesthetic...%b\n" "$blue" "$reset"
   printf '%b%s%b\n' "$pink" "$bottom" "$reset"
 }
 

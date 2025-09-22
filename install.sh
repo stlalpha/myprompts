@@ -129,7 +129,7 @@ prompt_yes_no() {
 }
 
 choose_prompt_variant() {
-  local preset=${MYPROMPTS_PROMPT_VARIANT:-${PROMPT_VARIANT:-}}
+  local preset=${PROMPT_VARIANT:-}
   preset=${preset,,}
   case "$preset" in
     liquid|animated)
@@ -189,7 +189,7 @@ choose_prompt_variant() {
 }
 
 choose_prompt_style() {
-  local preset=${MYPROMPTS_PROMPT_STYLE:-${PROMPT_STYLE:-}}
+  local preset=${PROMPT_STYLE:-}
   preset=${preset,,}
   case "$preset" in
     extended|multi-line)
@@ -209,6 +209,15 @@ choose_prompt_style() {
     return
   fi
 
+  local current=${MYPROMPTS_PROMPT_STYLE:-compact}
+  current=${current,,}
+  local default_choice_num=1
+  local default_choice_label="Compact"
+  if [[ $current == extended ]]; then
+    default_choice_num=2
+    default_choice_label="Extended"
+  fi
+
   local reset=$'\033[0m'
   local bold=$'\033[1m'
   local pink=$'\033[38;5;198m'
@@ -221,7 +230,7 @@ choose_prompt_style() {
   local magenta=$'\033[38;5;201m'
   local bg_dark=$'\033[48;5;234m'
 
-  printf '\nPrompt layout options:\n' >&"$PROMPT_FD"
+  printf '\nPrompt layout options (current: %s):\n' "$default_choice_label" >&"$PROMPT_FD"
   printf '  [1] Compact – single-line prompt\n' >&"$PROMPT_FD"
   printf '      %s%s◤%suser%s@%shost%s◢%s %s【%s~/project%s】%s %s『main』%s %s%s▸%s\n' \
     "$bg_dark" "$pink" "$cyan" "$dark_purple" "$purple" "$pink" "$reset" "$orange" "$green" "$orange" "$reset" "$magenta" "$reset" "$blue" "$bold" "$reset" \
@@ -234,12 +243,12 @@ choose_prompt_style() {
 
   local choice
   while true; do
-    printf 'Select prompt layout [1-2]: ' >&"$PROMPT_FD" || { error "Failed to display prompt layout question."; exit 1; }
+    printf 'Select prompt layout [1-2] (default: %s): ' "$default_choice_label" >&"$PROMPT_FD" || { error "Failed to display prompt layout question."; exit 1; }
     if ! IFS= read -r -u "$PROMPT_FD" choice; then
       error "Failed to read response; aborting installation."
       exit 1
     fi
-    choice=${choice:-1}
+    choice=${choice:-$default_choice_num}
     case "$choice" in
       1) echo "compact"; return ;;
       2) echo "extended"; return ;;

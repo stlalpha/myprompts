@@ -45,7 +45,8 @@ prompt_vaporwave_render() {
       PROMPT+=" ${NEON_CYAN}◆${RESET} "
       PROMPT+="${NEON_PINK}◤${NEON_PURPLE}%m${NEON_PINK}◢${RESET} "
       PROMPT+="${MINT_GREEN}➤ ${NEON_BLUE}%~${RESET} "
-      PROMPT+="${HOT_MAGENTA}\$(prompt_vaporwave_git_branch)${RESET}\n"
+      PROMPT+="${HOT_MAGENTA}\$(prompt_vaporwave_git_branch)${RESET}"
+      PROMPT+=$'\n'
       PROMPT+="${SUNSET_ORANGE}╰─${NEON_BLUE}▸${RESET} "
       ;;
     *)

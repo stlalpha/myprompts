@@ -34,7 +34,8 @@ if [[ $style == extended ]]; then
     PS1+=" ${NEON_CYAN}◆${RESET} "
     PS1+="${NEON_PINK}◤${NEON_PURPLE}\h${NEON_PINK}◢${RESET} "
     PS1+="${MINT_GREEN}➤ ${NEON_BLUE}\w${RESET} "
-    PS1+="${HOT_MAGENTA}\$(git_branch)${RESET}\n"
+    PS1+="${HOT_MAGENTA}\$(git_branch)${RESET}"
+    PS1+=$'\n'
     PS1+="${SUNSET_ORANGE}╰─${NEON_BLUE}▸${RESET} "
 else
     # Vaporwave-style prompt with Japanese aesthetic elements

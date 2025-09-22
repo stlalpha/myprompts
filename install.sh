@@ -11,6 +11,10 @@ PROMPT_LIQUID=vaporwave_liquid_prompt
 PROMPT_ZSH=vaporwave_zsh_prompt
 LS_COLORS_FILE=vaporwave_lscolors
 
+CONFIG_TMP_DIR=$(mktemp -d 2>/dev/null || mktemp -d -t myprompts)
+PACKAGES_CONFIG_URL="$BASE_URL/config/packages.sh"
+ALIASES_CONFIG_URL="$BASE_URL/config/aliases.sh"
+
 INTERACTIVE=0
 PROMPT_FD=0
 TTY_FD_OPENED=0
@@ -41,6 +45,9 @@ cleanup() {
   if [[ $TTY_FD_OPENED -eq 1 ]]; then
     exec 3>&-
   fi
+  if [[ -d $CONFIG_TMP_DIR ]]; then
+    rm -rf "$CONFIG_TMP_DIR"
+  fi
 }
 
 trap cleanup EXIT
@@ -63,6 +70,169 @@ print_header() {
   printf "  %bSpaceman's Auto-Personalizer%b %bv0.1b%b\n" "$cyan" "$reset" "$purple" "$reset"
   printf "  %bBootstrapping vaporwave shell and LS aesthetic...%b\n" "$blue" "$reset"
   printf '%b%s%b\n' "$pink" "$bottom" "$reset"
+}
+
+ensure_array() {
+  local name=$1
+  if ! declare -p "$name" >/dev/null 2>&1; then
+    eval "$name=()"
+  fi
+}
+
+load_configuration() {
+  local packages_file="$CONFIG_TMP_DIR/packages.sh"
+  local aliases_file="$CONFIG_TMP_DIR/aliases.sh"
+
+  if ! curl -fsSL "$PACKAGES_CONFIG_URL" -o "$packages_file"; then
+    warn "Unable to download packages configuration; skipping package bootstrap."
+  else
+    # shellcheck source=/dev/null
+    source "$packages_file"
+  fi
+
+  if ! curl -fsSL "$ALIASES_CONFIG_URL" -o "$aliases_file"; then
+    warn "Unable to download aliases configuration; skipping alias updates."
+  else
+    # shellcheck source=/dev/null
+    source "$aliases_file"
+  fi
+
+  ensure_array macos_brew_formulae
+  ensure_array macos_brew_casks
+  ensure_array linux_apt_packages
+  ensure_array linux_dnf_packages
+  ensure_array linux_pacman_packages
+  ensure_array zsh_aliases
+  ensure_array bash_aliases
+}
+
+detect_os() {
+  case "$(uname -s)" in
+    Darwin) echo macos ;;
+    Linux) echo linux ;;
+    *) echo unknown ;;
+  esac
+}
+
+ensure_homebrew_in_path() {
+  if [[ -x /opt/homebrew/bin/brew ]]; then
+    eval "$(/opt/homebrew/bin/brew shellenv)"
+  elif [[ -x /usr/local/bin/brew ]]; then
+    eval "$(/usr/local/bin/brew shellenv)"
+  fi
+}
+
+ensure_homebrew() {
+  if command -v brew >/dev/null 2>&1; then
+    ensure_homebrew_in_path
+    return
+  fi
+
+  info "Installing Homebrew (may prompt for your password)."
+  /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+  ensure_homebrew_in_path
+}
+
+install_brew_formulae() {
+  local packages=("$@")
+  [[ ${#packages[@]} -eq 0 ]] && return
+  info "Installing Homebrew formulae: ${packages[*]}"
+  for pkg in "${packages[@]}"; do
+    if brew list --formula "$pkg" >/dev/null 2>&1; then
+      info "brew formula '$pkg' already installed."
+    else
+      brew install "$pkg"
+    fi
+  done
+}
+
+install_brew_casks() {
+  local packages=("$@")
+  [[ ${#packages[@]} -eq 0 ]] && return
+  info "Installing Homebrew casks: ${packages[*]}"
+  for pkg in "${packages[@]}"; do
+    if brew list --cask "$pkg" >/dev/null 2>&1; then
+      info "brew cask '$pkg' already installed."
+    else
+      brew install --cask "$pkg"
+    fi
+  done
+}
+
+detect_linux_package_manager() {
+  if command -v apt-get >/dev/null 2>&1; then
+    echo apt
+  elif command -v dnf >/dev/null 2>&1; then
+    echo dnf
+  elif command -v pacman >/dev/null 2>&1; then
+    echo pacman
+  else
+    echo unknown
+  fi
+}
+
+install_apt_packages() {
+  local packages=("$@")
+  [[ ${#packages[@]} -eq 0 ]] && return
+  info "Installing apt packages: ${packages[*]}"
+  sudo apt-get update -y
+  sudo apt-get install -y "${packages[@]}"
+}
+
+install_dnf_packages() {
+  local packages=("$@")
+  [[ ${#packages[@]} -eq 0 ]] && return
+  info "Installing dnf packages: ${packages[*]}"
+  sudo dnf install -y "${packages[@]}"
+}
+
+install_pacman_packages() {
+  local packages=("$@")
+  [[ ${#packages[@]} -eq 0 ]] && return
+  info "Installing pacman packages: ${packages[*]}"
+  sudo pacman -Sy --noconfirm "${packages[@]}"
+}
+
+perform_os_bootstrap() {
+  local os=$1
+  case "$os" in
+    macos)
+      ensure_homebrew
+      install_brew_formulae "${macos_brew_formulae[@]}"
+      install_brew_casks "${macos_brew_casks[@]}"
+      ;;
+    linux)
+      local mgr
+      mgr=$(detect_linux_package_manager)
+      case "$mgr" in
+        apt) install_apt_packages "${linux_apt_packages[@]}" ;;
+        dnf) install_dnf_packages "${linux_dnf_packages[@]}" ;;
+        pacman) install_pacman_packages "${linux_pacman_packages[@]}" ;;
+        *) warn "Unsupported Linux package manager; skipping package installation." ;;
+      esac
+      ;;
+    *)
+      warn "Unable to determine operating system; skipping package installation."
+      ;;
+  esac
+}
+
+apply_aliases_for_shell() {
+  local rc_file=$1
+  local alias_array_name=$2
+
+  if ! declare -p "$alias_array_name" >/dev/null 2>&1; then
+    return
+  fi
+
+  local aliases
+  eval "aliases=(\"\${${alias_array_name}[@]}\")"
+
+  [[ ${#aliases[@]} -eq 0 ]] && return
+
+  local content
+  content=$(printf '%s\n' "${aliases[@]}")
+  append_block "$rc_file" "# >>> myprompts aliases >>>" "$content"
 }
 
 require_command() {
@@ -347,6 +517,25 @@ main() {
 
   handle_existing_install
 
+  load_configuration
+
+  local os_type
+  os_type=$(detect_os)
+  if [[ $os_type != unknown ]]; then
+    if (( INTERACTIVE )); then
+      local os_label=${os_type^}
+      if prompt_yes_no "Install recommended ${os_label} packages?" Y; then
+        perform_os_bootstrap "$os_type"
+      else
+        info "Skipped package installation."
+      fi
+    else
+      perform_os_bootstrap "$os_type"
+    fi
+  else
+    warn "Could not determine operating system automatically; package installation skipped."
+  fi
+
   info "Installing myprompts assets to ${INSTALL_ROOT/#$HOME/~}"
   mkdir -p "$INSTALL_ROOT"
 
@@ -378,6 +567,7 @@ main() {
     write_prompt_style "$HOME/.bashrc" "$prompt_style"
     append_block "$HOME/.bashrc" "# >>> myprompts prompt >>>" "source \"$INSTALL_ROOT/$bash_prompt_file\""
     configure_bash=1
+    apply_aliases_for_shell "$HOME/.bashrc" bash_aliases
   fi
 
   local zsh_default="N"
@@ -388,10 +578,10 @@ main() {
       choose_prompt_style prompt_style
       info "Using $prompt_style layout for prompts."
     fi
-    local zsh_prompt_file="$PROMPT_ZSH"
     write_prompt_style "$HOME/.zshrc" "$prompt_style"
-    append_block "$HOME/.zshrc" "# >>> myprompts prompt >>>" "[[ -f \"$INSTALL_ROOT/$zsh_prompt_file\" ]] && source \"$INSTALL_ROOT/$zsh_prompt_file\""
+    append_block "$HOME/.zshrc" "# >>> myprompts prompt >>>" "[[ -f \"$INSTALL_ROOT/$PROMPT_ZSH\" ]] && source \"$INSTALL_ROOT/$PROMPT_ZSH\""
     configure_zsh=1
+    apply_aliases_for_shell "$HOME/.zshrc" zsh_aliases
   fi
 
   if prompt_yes_no "Install Vaporwave LS_COLORS theme?" Y; then

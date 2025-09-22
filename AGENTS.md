@@ -6,7 +6,9 @@
 - `vaporwave_zsh_prompt`: Zsh-native prompt that mirrors the classic Bash layout, including git branch detection.
 - `vaporwave_lscolors`: exported `LS_COLORS` table that maps common extensions to the vaporwave colorway.
 - `vaporwave_ls_setup.sh`: legacy helper that only wires LS colors; retained for users who prefer manual sourcing.
-- `install.sh`: curl-friendly bootstrapper; detects existing installs, prompts before purging, and wires assets under `~/.local/share/myprompts`.
+- `config/packages.sh`: Bash-sourced config describing Homebrew/apt/etc. packages per platform.
+- `config/aliases.sh`: alias definitions grouped by shell.
+- `install.sh`: curl-friendly bootstrapper; detects existing installs, prompts before purging, installs OS-specific packages from `config`, and wires assets under `~/.local/share/myprompts`.
 
 ## Build, Test, and Development Commands
 - There is no compilation step; source prompt files directly during development:
@@ -20,7 +22,7 @@
   HOME=$(mktemp -d) BASE_URL="file://$PWD" INSTALL_ROOT="$HOME/.myprompts" \
   SHELL=/bin/bash bash ./install.sh
   ```
-- Non-interactive runs can pre-select variants, e.g. `PROMPT_VARIANT=liquid PROMPT_STYLE=extended ./install.sh` (otherwise the script uses `/dev/tty` so `curl ... | bash` stays interactive).
+- Non-interactive runs can pre-select variants, e.g. `PROMPT_VARIANT=liquid PROMPT_STYLE=extended ./install.sh` (otherwise the script uses `/dev/tty` so `curl ... | bash` stays interactive). Set `MYPROMPTS_NONINTERACTIVE=1` to skip interactivity (packages still install automatically).
 - Apply the LS colors locally before shipping changes:
   ```bash
   cp vaporwave_lscolors ~/.vaporwave_lscolors
@@ -39,6 +41,7 @@
 - Exercise animated prompts in terminals that support 256 colors and Unicode; fall back gracefully in minimal TTYs.
 - For Zsh, ensure `setopt prompt_subst` is active and the prompt renders without layout drift on `%n`, `%m`, and `%~` substitutions.
 - After running `install.sh` (or sourcing `vaporwave_lscolors` directly), open a new session and check `ls -la --color=auto` for expected palette; the installer injects an `alias ls='ls --color=auto'` block when no alias exists.
+- Validate package bootstrap by overriding `PACKAGES_CONFIG_URL` to a fixture and running with `MYPROMPTS_NONINTERACTIVE=1` so CI can simulate the flow without performing installs.
 
 ## Commit & Pull Request Guidelines
 - Follow Conventional Commits (e.g., `feat: add liquid prompt throttle`) so tooling can parse change intent.
@@ -47,4 +50,5 @@
 
 ## Setup Tips for New Agents
 - Keep local copies of prompts under version control; do not edit the installed dotfiles directly.
+- Extend `config/packages.sh`/`config/aliases.sh` to add software or aliases; keep entries grouped per OS/package manager.
 - Document any terminal-specific tweaks (e.g., iTerm color profiles) in the PR to inform reviewers and downstream users.

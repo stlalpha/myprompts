@@ -134,23 +134,23 @@ prompt_yes_no() {
 }
 
 choose_prompt_variant() {
- local preset=""
+  local __out_var=$1
+  local preset=""
+  local selection=""
+
   if (( ! INTERACTIVE )); then
     preset=${PROMPT_VARIANT:-}
     preset=${preset,,}
     case "$preset" in
       liquid|animated)
-        echo "$PROMPT_LIQUID"
-        return
+        selection="$PROMPT_LIQUID"
         ;;
-      classic|static|vaporwave)
-        echo "$PROMPT_STATIC"
-        return
+      classic|static|vaporwave|"")
+        selection="$PROMPT_STATIC"
         ;;
-      "") ;;
       *) error "Unknown PROMPT_VARIANT '$preset'; expected 'classic' or 'liquid'."; exit 1 ;;
     esac
-    echo "$PROMPT_STATIC"
+    printf -v "$__out_var" '%s' "$selection"
     return
   fi
 
@@ -187,31 +187,32 @@ choose_prompt_variant() {
     fi
     choice=${choice:-1}
     case "$choice" in
-      1) echo "$PROMPT_STATIC"; return ;;
-      2) echo "$PROMPT_LIQUID"; return ;;
+      1) selection="$PROMPT_STATIC"; break ;;
+      2) selection="$PROMPT_LIQUID"; break ;;
       *) printf 'Please enter 1 or 2.\n' >&"$PROMPT_FD" ;;
     esac
   done
+
+  printf -v "$__out_var" '%s' "$selection"
 }
 
 choose_prompt_style() {
+  local __out_var=$1
   local preset=""
+  local selection=""
   if (( ! INTERACTIVE )); then
     preset=${PROMPT_STYLE:-}
     preset=${preset,,}
     case "$preset" in
       extended|multi-line)
-        echo "extended"
-        return
+        selection="extended"
         ;;
-      compact|single-line|default)
-        echo "compact"
-        return
+      compact|single-line|default|"")
+        selection="compact"
         ;;
-      "") ;;
       *) error "Unknown PROMPT_STYLE '$preset'; expected 'compact' or 'extended'."; exit 1 ;;
     esac
-    echo "compact"
+    printf -v "$__out_var" '%s' "$selection"
     return
   fi
 
@@ -257,11 +258,13 @@ choose_prompt_style() {
     fi
     choice=${choice:-$default_choice_num}
     case "$choice" in
-      1) echo "compact"; return ;;
-      2) echo "extended"; return ;;
+      1) selection="compact"; break ;;
+      2) selection="extended"; break ;;
       *) printf 'Please enter 1 or 2.\n' >&"$PROMPT_FD" ;;
     esac
   done
+
+  printf -v "$__out_var" '%s' "$selection"
 }
 
 append_block() {
@@ -349,11 +352,11 @@ main() {
 
   if prompt_yes_no "Configure Bash prompt?" "$bash_default"; then
     if [[ -z $prompt_style ]]; then
-      prompt_style=$(choose_prompt_style)
+      choose_prompt_style prompt_style
       info "Using $prompt_style layout for prompts."
     fi
-    local bash_prompt_file
-    bash_prompt_file=$(choose_prompt_variant)
+    local bash_prompt_file=""
+    choose_prompt_variant bash_prompt_file
     write_prompt_style "$HOME/.bashrc" "$prompt_style"
     append_block "$HOME/.bashrc" "# >>> myprompts prompt >>>" "source \"$INSTALL_ROOT/$bash_prompt_file\""
     configure_bash=1
@@ -364,11 +367,12 @@ main() {
 
   if prompt_yes_no "Configure Zsh prompt?" "$zsh_default"; then
     if [[ -z $prompt_style ]]; then
-      prompt_style=$(choose_prompt_style)
+      choose_prompt_style prompt_style
       info "Using $prompt_style layout for prompts."
     fi
+    local zsh_prompt_file="$PROMPT_ZSH"
     write_prompt_style "$HOME/.zshrc" "$prompt_style"
-    append_block "$HOME/.zshrc" "# >>> myprompts prompt >>>" "[[ -f \"$INSTALL_ROOT/$PROMPT_ZSH\" ]] && source \"$INSTALL_ROOT/$PROMPT_ZSH\""
+    append_block "$HOME/.zshrc" "# >>> myprompts prompt >>>" "[[ -f \"$INSTALL_ROOT/$zsh_prompt_file\" ]] && source \"$INSTALL_ROOT/$zsh_prompt_file\""
     configure_zsh=1
   fi
 

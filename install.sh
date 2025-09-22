@@ -56,12 +56,13 @@ print_header() {
   local purple=$'\033[38;5;141m'
   local blue=$'\033[38;5;39m'
 
-  cat <<BANNER
-${pink}╔════════════════════════════════════════════════════════════╗${reset}
-${pink}║${reset}  ${cyan}Spaceman's Auto-Personalizer${reset} ${purple}v0.1b${reset}                        ${pink}║${reset}
-${pink}║${reset}  ${blue}Bootstrapping vaporwave shell and LS aesthetic...${reset}            ${pink}║${reset}
-${pink}╚════════════════════════════════════════════════════════════╝${reset}
-BANNER
+  local top=".0Oo............................................................oO0>"
+  local bottom="<0Oo............................................................oO0."
+
+  printf '%b%s%b\n' "$pink" "$top" "$reset"
+  printf '  %bSpaceman\'s Auto-Personalizer%b %bv0.1b%b\n' "$cyan" "$reset" "$purple" "$reset"
+  printf '  %bBootstrapping vaporwave shell and LS aesthetic...%b\n' "$blue" "$reset"
+  printf '%b%s%b\n' "$pink" "$bottom" "$reset"
 }
 
 require_command() {

@@ -149,12 +149,14 @@ choose_prompt_variant() {
     return
   fi
 
-  cat <<'CHOICES'
+  cat <<'PREVIEW'
 
 Prompt variant options:
   [1] Classic – static vaporwave prompt
+      ◤user@host◢ 【~/project】 『main』 ▸
   [2] Liquid – animated waveform prompt
-CHOICES
+      ◤user@host◢ ≋∼≋ 【~/project】 『main』 ≋▸
+PREVIEW
 
   local choice
   while true; do
@@ -192,12 +194,15 @@ choose_prompt_style() {
     return
   fi
 
-  cat <<'CHOICES'
+  cat <<'PREVIEW'
 
 Prompt layout options:
   [1] Compact – single-line prompt
+      ◤user@host◢ 【~/project】 『main』 ▸
   [2] Extended – multi-line prompt with decorative header
-CHOICES
+      【user】◆【host】 ➤ ~/project 『main』
+      ╰─▸
+PREVIEW
 
   local choice
   while true; do

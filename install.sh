@@ -12,9 +12,27 @@ PROMPT_ZSH=vaporwave_zsh_prompt
 LS_COLORS_FILE=vaporwave_lscolors
 
 INTERACTIVE=0
-if [[ -t 0 && -t 1 ]]; then
+PROMPT_FD=0
+TTY_FD_OPENED=0
+
+if [[ -r /dev/tty && -w /dev/tty ]]; then
+  if exec 3<>/dev/tty; then
+    PROMPT_FD=3
+    INTERACTIVE=1
+    TTY_FD_OPENED=1
+  fi
+elif [[ -t 0 ]]; then
+  PROMPT_FD=0
   INTERACTIVE=1
 fi
+
+cleanup() {
+  if [[ $TTY_FD_OPENED -eq 1 ]]; then
+    exec 3>&-
+  fi
+}
+
+trap cleanup EXIT
 
 info()  { printf '\e[1;36m[info]\e[0m %s\n' "$*"; }
 warn()  { printf '\e[1;33m[warn]\e[0m %s\n' "$*"; }
@@ -45,7 +63,10 @@ NOTICE
 
     local response
     while true; do
-      read -r -p "Choose an option [R/C]: " response
+      if ! read -r -u "$PROMPT_FD" -p "Choose an option [R/C]: " response; then
+        warn "Could not read response; defaulting to cancel."
+        response=c
+      fi
       response=${response:-R}
       response=${response,,}
       case "$response" in
@@ -54,7 +75,6 @@ NOTICE
           rm -rf "$INSTALL_ROOT"
           break
           ;;
-
         c|cancel)
           info "Installation cancelled; existing setup left untouched."
           exit 0
@@ -88,7 +108,10 @@ prompt_yes_no() {
   fi
 
   while true; do
-    read -r -p "$prompt" reply
+    if ! read -r -u "$PROMPT_FD" -p "$prompt" reply; then
+      warn "Could not read response; defaulting to $default."
+      reply=$default
+    fi
     reply=${reply:-$default}
     reply=${reply,,}
     case "$reply" in
@@ -128,7 +151,10 @@ CHOICES
 
   local choice
   while true; do
-    read -r -p "Enter choice [1/2]: " choice
+    if ! read -r -u "$PROMPT_FD" -p "Enter choice [1/2]: " choice; then
+      warn "Could not read response; defaulting to 1."
+      choice=1
+    fi
     choice=${choice:-1}
     case "$choice" in
       1) echo "$PROMPT_STATIC"; return ;;
@@ -167,7 +193,10 @@ CHOICES
 
   local choice
   while true; do
-    read -r -p "Enter choice [1/2]: " choice
+    if ! read -r -u "$PROMPT_FD" -p "Enter choice [1/2]: " choice; then
+      warn "Could not read response; defaulting to 1."
+      choice=1
+    fi
     choice=${choice:-1}
     case "$choice" in
       1) echo "compact"; return ;;
@@ -287,13 +316,25 @@ main() {
 
   if prompt_yes_no "Install Vaporwave LS_COLORS theme?" Y; then
     local line="[ -f \"$INSTALL_ROOT/$LS_COLORS_FILE\" ] && source \"$INSTALL_ROOT/$LS_COLORS_FILE\""
-    if (( configure_bash )) || [[ -f $HOME/.bashrc ]]; then
+
+    if (( configure_bash )); then
       append_block "$HOME/.bashrc" "# >>> myprompts lscolors >>>" "$line"
       ensure_ls_alias "$HOME/.bashrc"
+    elif [[ -f $HOME/.bashrc ]]; then
+      if prompt_yes_no "Add LS colors to Bash (.bashrc)?" N; then
+        append_block "$HOME/.bashrc" "# >>> myprompts lscolors >>>" "$line"
+        ensure_ls_alias "$HOME/.bashrc"
+      fi
     fi
-    if (( configure_zsh )) || [[ -f $HOME/.zshrc ]]; then
+
+    if (( configure_zsh )); then
       append_block "$HOME/.zshrc" "# >>> myprompts lscolors >>>" "$line"
       ensure_ls_alias "$HOME/.zshrc"
+    elif [[ -f $HOME/.zshrc ]]; then
+      if prompt_yes_no "Add LS colors to Zsh (.zshrc)?" Y; then
+        append_block "$HOME/.zshrc" "# >>> myprompts lscolors >>>" "$line"
+        ensure_ls_alias "$HOME/.zshrc"
+      fi
     fi
   fi
 

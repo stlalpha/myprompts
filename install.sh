@@ -20,10 +20,16 @@ if [[ -r /dev/tty && -w /dev/tty ]]; then
     PROMPT_FD=3
     INTERACTIVE=1
     TTY_FD_OPENED=1
+  else
+    error "Unable to open /dev/tty for interactive prompts." 
+    exit 1
   fi
 elif [[ -t 0 ]]; then
   PROMPT_FD=0
   INTERACTIVE=1
+else
+  error "No interactive terminal detected; run the installer from an interactive shell." 
+  exit 1
 fi
 
 cleanup() {
@@ -64,8 +70,8 @@ NOTICE
     local response
     while true; do
       if ! read -r -u "$PROMPT_FD" -p "Choose an option [R/C]: " response; then
-        warn "Could not read response; defaulting to cancel."
-        response=c
+        error "Failed to read response; aborting installation."
+        exit 1
       fi
       response=${response:-R}
       response=${response,,}
@@ -85,8 +91,8 @@ NOTICE
       esac
     done
   else
-    warn "Existing installation detected; clearing $INSTALL_ROOT for reinstall."
-    rm -rf "$INSTALL_ROOT"
+    error "Existing installation detected but no interactive terminal available to confirm removal."
+    exit 1
   fi
 }
 
@@ -109,8 +115,8 @@ prompt_yes_no() {
 
   while true; do
     if ! read -r -u "$PROMPT_FD" -p "$prompt" reply; then
-      warn "Could not read response; defaulting to $default."
-      reply=$default
+      error "Failed to read response; aborting installation."
+      exit 1
     fi
     reply=${reply:-$default}
     reply=${reply,,}
@@ -135,7 +141,7 @@ choose_prompt_variant() {
       return
       ;;
     "") ;;
-    *) warn "Unknown PROMPT_VARIANT '$preset'; falling back to interactive prompt." ;;
+    *) error "Unknown PROMPT_VARIANT '$preset'; expected 'classic' or 'liquid'."; exit 1 ;;
   esac
 
   if (( ! INTERACTIVE )); then
@@ -153,8 +159,8 @@ CHOICES
   local choice
   while true; do
     if ! read -r -u "$PROMPT_FD" -p "Select prompt variant [1-2]: " choice; then
-      warn "Could not read response; defaulting to 1."
-      choice=1
+      error "Failed to read response; aborting installation."
+      exit 1
     fi
     choice=${choice:-1}
     case "$choice" in
@@ -178,7 +184,7 @@ choose_prompt_style() {
       return
       ;;
     "") ;;
-    *) warn "Unknown PROMPT_STYLE '$preset'; falling back to interactive prompt." ;;
+    *) error "Unknown PROMPT_STYLE '$preset'; expected 'compact' or 'extended'."; exit 1 ;;
   esac
 
   if (( ! INTERACTIVE )); then
@@ -196,8 +202,8 @@ CHOICES
   local choice
   while true; do
     if ! read -r -u "$PROMPT_FD" -p "Select prompt layout [1-2]: " choice; then
-      warn "Could not read response; defaulting to 1."
-      choice=1
+      error "Failed to read response; aborting installation."
+      exit 1
     fi
     choice=${choice:-1}
     case "$choice" in

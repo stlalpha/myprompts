@@ -15,21 +15,26 @@ INTERACTIVE=0
 PROMPT_FD=0
 TTY_FD_OPENED=0
 
-if [[ -r /dev/tty && -w /dev/tty ]]; then
-  if exec 3<>/dev/tty; then
-    PROMPT_FD=3
+if [[ -n ${MYPROMPTS_NONINTERACTIVE:-} ]]; then
+  PROMPT_FD=0
+  INTERACTIVE=0
+else
+  if [[ -r /dev/tty && -w /dev/tty ]]; then
+    if exec 3<>/dev/tty; then
+      PROMPT_FD=3
+      INTERACTIVE=1
+      TTY_FD_OPENED=1
+    else
+      echo "Unable to open /dev/tty for interactive prompts." >&2
+      exit 1
+    fi
+  elif [[ -t 0 ]]; then
+    PROMPT_FD=0
     INTERACTIVE=1
-    TTY_FD_OPENED=1
   else
-    error "Unable to open /dev/tty for interactive prompts." 
+    echo "No interactive terminal detected; run the installer from an interactive shell." >&2
     exit 1
   fi
-elif [[ -t 0 ]]; then
-  PROMPT_FD=0
-  INTERACTIVE=1
-else
-  error "No interactive terminal detected; run the installer from an interactive shell." 
-  exit 1
 fi
 
 cleanup() {
@@ -129,7 +134,7 @@ prompt_yes_no() {
 }
 
 choose_prompt_variant() {
-  local preset=""
+ local preset=""
   if (( ! INTERACTIVE )); then
     preset=${PROMPT_VARIANT:-}
     preset=${preset,,}

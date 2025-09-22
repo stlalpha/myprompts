@@ -162,17 +162,17 @@ choose_prompt_variant() {
   local wave=$'\033[38;5;123m'
   local bg_dark=$'\033[48;5;234m'
 
-  printf '\nPrompt variant options:\n' >&"$PROMPT_FD"
-  printf '  [1] Classic – static vaporwave prompt\n' >&"$PROMPT_FD"
+  printf '\nPrompt variant options:\n'
+  printf '  [1] Classic – static vaporwave prompt\n'
   printf '      %s%s◤%suser%s@%shost%s◢%s %s【%s~/project%s】%s %s『main』%s %s%s▸%s\n' \
-    "$bg_dark" "$pink" "$cyan" "$dark_purple" "$purple" "$pink" "$reset" "$orange" "$green" "$orange" "$reset" "$magenta" "$reset" "$blue" "$bold" "$reset" >&"$PROMPT_FD"
-  printf '  [2] Liquid – animated waveform prompt\n' >&"$PROMPT_FD"
+    "$bg_dark" "$pink" "$cyan" "$dark_purple" "$purple" "$pink" "$reset" "$orange" "$green" "$orange" "$reset" "$magenta" "$reset" "$blue" "$bold" "$reset"
+  printf '  [2] Liquid – animated waveform prompt\n'
   printf '      %s%s◤%suser%s@%shost%s◢%s %s≈≋≈%s %s~/project%s %s≈≋≈%s %s『main』%s %s%s∼▸%s%s\n' \
-    "$bg_dark" "$pink" "$cyan" "$dark_purple" "$purple" "$pink" "$reset" "$wave" "$reset" "$green" "$reset" "$wave" "$reset" "$magenta" "$reset" "$wave" "$bold" "$reset" "$reset" >&"$PROMPT_FD"
+    "$bg_dark" "$pink" "$cyan" "$dark_purple" "$purple" "$pink" "$reset" "$wave" "$reset" "$green" "$reset" "$wave" "$reset" "$magenta" "$reset" "$wave" "$bold" "$reset" "$reset"
 
   local choice
   while true; do
-    if ! printf 'Select prompt variant [1-2]: ' >&"$PROMPT_FD"; then
+    if ! printf 'Select prompt variant [1-2]: '; then
       error "Failed to display prompt variant question."
       exit 1
     fi
@@ -231,18 +231,18 @@ choose_prompt_style() {
   local magenta=$'\033[38;5;201m'
   local bg_dark=$'\033[48;5;234m'
 
-  printf '\nPrompt layout options (current: %s):\n' "$default_choice_label" >&"$PROMPT_FD"
-  printf '  [1] Compact – single-line prompt\n' >&"$PROMPT_FD"
+  printf '\nPrompt layout options (current: %s):\n' "$default_choice_label"
+  printf '  [1] Compact – single-line prompt\n'
   printf '      %s%s◤%suser%s@%shost%s◢%s %s【%s~/project%s】%s %s『main』%s %s%s▸%s\n' \
-    "$bg_dark" "$pink" "$cyan" "$dark_purple" "$purple" "$pink" "$reset" "$orange" "$green" "$orange" "$reset" "$magenta" "$reset" "$blue" "$bold" "$reset" >&"$PROMPT_FD"
-  printf '  [2] Extended – multi-line prompt with decorative header\n' >&"$PROMPT_FD"
+    "$bg_dark" "$pink" "$cyan" "$dark_purple" "$purple" "$pink" "$reset" "$orange" "$green" "$orange" "$reset" "$magenta" "$reset" "$blue" "$bold" "$reset"
+  printf '  [2] Extended – multi-line prompt with decorative header\n'
   printf '      %s◤%suser%s◢%s %s◆%s %s◤%shost%s◢%s %s➤ %s~/project%s %s『main』%s\n' \
-    "$pink" "$cyan" "$pink" "$reset" "$cyan" "$reset" "$pink" "$purple" "$pink" "$reset" "$green" "$blue" "$reset" "$magenta" "$reset" >&"$PROMPT_FD"
-  printf '      %s╰─%s%s▸%s\n' "$orange" "$blue" "$bold" "$reset" >&"$PROMPT_FD"
+    "$pink" "$cyan" "$pink" "$reset" "$cyan" "$reset" "$pink" "$purple" "$pink" "$reset" "$green" "$blue" "$reset" "$magenta" "$reset"
+  printf '      %s╰─%s%s▸%s\n' "$orange" "$blue" "$bold" "$reset"
 
   local choice
   while true; do
-    if ! printf 'Select prompt layout [1-2] (default: %s): ' "$default_choice_label" >&"$PROMPT_FD"; then
+    if ! printf 'Select prompt layout [1-2] (default: %s): ' "$default_choice_label"; then
       error "Failed to display prompt layout question."
       exit 1
     fi

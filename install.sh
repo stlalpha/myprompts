@@ -117,6 +117,19 @@ download_asset() {
   chmod 644 "$target"
 }
 
+ensure_ls_alias() {
+  local file=$1
+  local marker="# >>> myprompts ls alias >>>"
+  local alias_line="alias ls='ls --color=auto'"
+
+  if [[ -f $file ]] && grep -qE '^[[:space:]]*alias[[:space:]]+ls=' "$file"; then
+    info "Existing ls alias detected in ${file/#$HOME/~}; skipping alias install."
+    return
+  fi
+
+  append_block "$file" "$marker" "$alias_line"
+}
+
 main() {
   require_command curl
 
@@ -157,9 +170,11 @@ main() {
     local line="[ -f \"$INSTALL_ROOT/$LS_COLORS_FILE\" ] && source \"$INSTALL_ROOT/$LS_COLORS_FILE\""
     if (( configure_bash )) || [[ -f $HOME/.bashrc ]]; then
       append_block "$HOME/.bashrc" "# >>> myprompts lscolors >>>" "$line"
+      ensure_ls_alias "$HOME/.bashrc"
     fi
     if (( configure_zsh )) || [[ -f $HOME/.zshrc ]]; then
       append_block "$HOME/.zshrc" "# >>> myprompts lscolors >>>" "$line"
+      ensure_ls_alias "$HOME/.zshrc"
     fi
   fi
 

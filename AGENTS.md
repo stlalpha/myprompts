@@ -36,7 +36,7 @@
 - Validate prompts by sourcing the script in a fresh shell and confirming user, host, path, and git branch render correctly.
 - Exercise animated prompts in terminals that support 256 colors and Unicode; fall back gracefully in minimal TTYs.
 - For Zsh, ensure `setopt prompt_subst` is active and the prompt renders without layout drift on `%n`, `%m`, and `%~` substitutions.
-- After running `install.sh` (or sourcing `vaporwave_lscolors` directly), open a new session and check `ls -la --color=auto` for expected palette.
+- After running `install.sh` (or sourcing `vaporwave_lscolors` directly), open a new session and check `ls -la --color=auto` for expected palette; the installer injects an `alias ls='ls --color=auto'` block when no alias exists.
 
 ## Commit & Pull Request Guidelines
 - Follow Conventional Commits (e.g., `feat: add liquid prompt throttle`) so tooling can parse change intent.

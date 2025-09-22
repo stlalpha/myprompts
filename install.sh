@@ -149,14 +149,28 @@ choose_prompt_variant() {
     return
   fi
 
-  cat >&"$PROMPT_FD" <<'PREVIEW'
+  local reset=$'\033[0m'
+  local bold=$'\033[1m'
+  local pink=$'\033[38;5;198m'
+  local cyan=$'\033[38;5;51m'
+  local purple=$'\033[38;5;141m'
+  local dark_purple=$'\033[38;5;93m'
+  local blue=$'\033[38;5;39m'
+  local orange=$'\033[38;5;209m'
+  local green=$'\033[38;5;85m'
+  local magenta=$'\033[38;5;201m'
+  local wave=$'\033[38;5;123m'
+  local bg_dark=$'\033[48;5;234m'
 
-Prompt variant options:
-  [1] Classic – static vaporwave prompt
-      ◤user@host◢ 【~/project】 『main』 ▸
-  [2] Liquid – animated waveform prompt
-      ◤user@host◢ ≋∼≋ 【~/project】 『main』 ≋▸
-PREVIEW
+  printf '\nPrompt variant options:\n' >&"$PROMPT_FD"
+  printf '  [1] Classic – static vaporwave prompt\n' >&"$PROMPT_FD"
+  printf '      %s%s◤%suser%s@%shost%s◢%s %s【%s~/project%s】%s %s『main』%s %s%s▸%s\n' \
+    "$bg_dark" "$pink" "$cyan" "$dark_purple" "$purple" "$pink" "$reset" "$orange" "$green" "$orange" "$reset" "$magenta" "$reset" "$blue" "$bold" "$reset" \
+    >&"$PROMPT_FD"
+  printf '  [2] Liquid – animated waveform prompt\n' >&"$PROMPT_FD"
+  printf '      %s%s◤%suser%s@%shost%s◢%s %s≈≋≈%s %s~/project%s %s≈≋≈%s %s『main』%s %s%s∼▸%s%s\n' \
+    "$bg_dark" "$pink" "$cyan" "$dark_purple" "$purple" "$pink" "$reset" "$wave" "$reset" "$green" "$reset" "$wave" "$reset" "$magenta" "$reset" "$wave" "$bold" "$reset" "$reset" \
+    >&"$PROMPT_FD"
 
   local choice
   while true; do
@@ -195,15 +209,28 @@ choose_prompt_style() {
     return
   fi
 
-  cat >&"$PROMPT_FD" <<'PREVIEW'
+  local reset=$'\033[0m'
+  local bold=$'\033[1m'
+  local pink=$'\033[38;5;198m'
+  local cyan=$'\033[38;5;51m'
+  local purple=$'\033[38;5;141m'
+  local dark_purple=$'\033[38;5;93m'
+  local blue=$'\033[38;5;39m'
+  local orange=$'\033[38;5;209m'
+  local green=$'\033[38;5;85m'
+  local magenta=$'\033[38;5;201m'
+  local bg_dark=$'\033[48;5;234m'
 
-Prompt layout options:
-  [1] Compact – single-line prompt
-      ◤user@host◢ 【~/project】 『main』 ▸
-  [2] Extended – multi-line prompt with decorative header
-      【user】◆【host】 ➤ ~/project 『main』
-      ╰─▸
-PREVIEW
+  printf '\nPrompt layout options:\n' >&"$PROMPT_FD"
+  printf '  [1] Compact – single-line prompt\n' >&"$PROMPT_FD"
+  printf '      %s%s◤%suser%s@%shost%s◢%s %s【%s~/project%s】%s %s『main』%s %s%s▸%s\n' \
+    "$bg_dark" "$pink" "$cyan" "$dark_purple" "$purple" "$pink" "$reset" "$orange" "$green" "$orange" "$reset" "$magenta" "$reset" "$blue" "$bold" "$reset" \
+    >&"$PROMPT_FD"
+  printf '  [2] Extended – multi-line prompt with decorative header\n' >&"$PROMPT_FD"
+  printf '      %s◤%suser%s◢%s %s◆%s %s◤%shost%s◢%s %s➤ %s~/project%s %s『main』%s\n' \
+    "$pink" "$cyan" "$pink" "$reset" "$cyan" "$reset" "$pink" "$purple" "$pink" "$reset" "$green" "$blue" "$reset" "$magenta" "$reset" \
+    >&"$PROMPT_FD"
+  printf '      %s╰─%s%s▸%s\n' "$orange" "$blue" "$bold" "$reset" >&"$PROMPT_FD"
 
   local choice
   while true; do

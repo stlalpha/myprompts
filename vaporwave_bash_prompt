@@ -30,12 +30,12 @@ style="${MYPROMPTS_PROMPT_STYLE:-compact}"
 style=${style,,}
 
 if [[ $style == extended ]]; then
-    PS1="${DARK_PURPLE}【${NEON_PINK}\u${DARK_PURPLE}】${RESET}"
-    PS1+="${NEON_CYAN}◆${RESET}"
-    PS1+="${DARK_PURPLE}【${NEON_PURPLE}\h${DARK_PURPLE}】${RESET} "
+    PS1="${NEON_PINK}◤${NEON_CYAN}\u${NEON_PINK}◢${RESET}"
+    PS1+=" ${NEON_CYAN}◆${RESET} "
+    PS1+="${NEON_PINK}◤${NEON_PURPLE}\h${NEON_PINK}◢${RESET} "
     PS1+="${MINT_GREEN}➤ ${NEON_BLUE}\w${RESET} "
     PS1+="${HOT_MAGENTA}\$(git_branch)${RESET}\n"
-    PS1+="${SUNSET_ORANGE}╰─▸${RESET} "
+    PS1+="${SUNSET_ORANGE}╰─${NEON_BLUE}▸${RESET} "
 else
     # Vaporwave-style prompt with Japanese aesthetic elements
     # Format: ◤user@host◢ 【path】 『git』 ▸

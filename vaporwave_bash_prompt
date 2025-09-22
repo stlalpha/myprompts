@@ -26,21 +26,24 @@ git_branch() {
     git branch 2> /dev/null | sed -e '/^[^*]/d' -e 's/* \(.*\)/『\1』/'
 }
 
-# Vaporwave-style prompt with Japanese aesthetic elements
-# Format: ◤user@host◢ 【path】 『git』 ▸
-PS1="${BG_DARK}${NEON_PINK}◤${NEON_CYAN}\u${DARK_PURPLE}@${NEON_PURPLE}\h${NEON_PINK}◢${RESET} "
-PS1+="${SUNSET_ORANGE}【${MINT_GREEN}\w${SUNSET_ORANGE}】${RESET} "
-PS1+="${HOT_MAGENTA}\$(git_branch)${RESET} "
-PS1+="${NEON_BLUE}${BOLD}▸${RESET} "
+style="${MYPROMPTS_PROMPT_STYLE:-compact}"
+style=${style,,}
 
-# Alternative design with more vaporwave elements
-# Uncomment to use this version instead
-# PS1="${DARK_PURPLE}【${NEON_PINK}\u${DARK_PURPLE}】${RESET}"
-# PS1+="${NEON_CYAN}◆${RESET}"
-# PS1+="${DARK_PURPLE}【${NEON_PURPLE}\h${DARK_PURPLE}】${RESET} "
-# PS1+="${MINT_GREEN}➤ ${NEON_BLUE}\w${RESET} "
-# PS1+="${HOT_MAGENTA}\$(git_branch)${RESET}\n"
-# PS1+="${SUNSET_ORANGE}╰─▸${RESET} "
+if [[ $style == extended ]]; then
+    PS1="${DARK_PURPLE}【${NEON_PINK}\u${DARK_PURPLE}】${RESET}"
+    PS1+="${NEON_CYAN}◆${RESET}"
+    PS1+="${DARK_PURPLE}【${NEON_PURPLE}\h${DARK_PURPLE}】${RESET} "
+    PS1+="${MINT_GREEN}➤ ${NEON_BLUE}\w${RESET} "
+    PS1+="${HOT_MAGENTA}\$(git_branch)${RESET}\n"
+    PS1+="${SUNSET_ORANGE}╰─▸${RESET} "
+else
+    # Vaporwave-style prompt with Japanese aesthetic elements
+    # Format: ◤user@host◢ 【path】 『git』 ▸
+    PS1="${BG_DARK}${NEON_PINK}◤${NEON_CYAN}\u${DARK_PURPLE}@${NEON_PURPLE}\h${NEON_PINK}◢${RESET} "
+    PS1+="${SUNSET_ORANGE}【${MINT_GREEN}\w${SUNSET_ORANGE}】${RESET} "
+    PS1+="${HOT_MAGENTA}\$(git_branch)${RESET} "
+    PS1+="${NEON_BLUE}${BOLD}▸${RESET} "
+fi
 
 # Export the prompt
 export PS1

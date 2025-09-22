@@ -86,27 +86,29 @@ get_wave_color() {
     esac
 }
 
-# Main prompt with liquid animation
-# The $(command) syntax ensures it's evaluated each time the prompt is displayed
-PS1="${BG_DARK}${NEON_PINK}◤${NEON_CYAN}\u${DARK_PURPLE}@${NEON_PURPLE}\h${NEON_PINK}◢${RESET} "
+style="${MYPROMPTS_PROMPT_STYLE:-compact}"
+style=${style,,}
 
-# Animated liquid waves around the path
-PS1+="\$(get_wave_color)\$(get_liquid_wave)${MINT_GREEN}\w\$(get_wave_color)\$(get_liquid_wave)${RESET} "
+if [[ $style == extended ]]; then
+    PS1="${DARK_PURPLE}【${NEON_PINK}\u${DARK_PURPLE}】${RESET}"
+    PS1+="${NEON_CYAN}◆${RESET}"
+    PS1+="${DARK_PURPLE}【${NEON_PURPLE}\h${DARK_PURPLE}】${RESET} "
+    PS1+="${MINT_GREEN}➤ ${NEON_BLUE}\w${RESET} "
+    PS1+="${HOT_MAGENTA}\$(git_branch)${RESET}\n"
+    PS1+="${SUNSET_ORANGE}╰─\$(get_wave_color)\$(get_flowing_liquid)▸${RESET} "
+else
+    # Main prompt with liquid animation
+    # The $(command) syntax ensures it's evaluated each time the prompt is displayed
+    PS1="${BG_DARK}${NEON_PINK}◤${NEON_CYAN}\u${DARK_PURPLE}@${NEON_PURPLE}\h${NEON_PINK}◢${RESET} "
 
-# Git branch with flowing effect
-PS1+="${HOT_MAGENTA}\$(git_branch)${RESET} "
+    # Animated liquid waves around the path
+    PS1+="\$(get_wave_color)\$(get_liquid_wave)${MINT_GREEN}\w\$(get_wave_color)\$(get_liquid_wave)${RESET} "
 
-# Animated prompt symbol
-PS1+="\$(get_wave_color)${BOLD}\$(get_smooth_flow)▸${RESET} "
+    # Git branch with flowing effect
+    PS1+="${HOT_MAGENTA}\$(git_branch)${RESET} "
 
-# Alternative design with more liquid elements
-# Uncomment for a different style
-# PS1="\$(get_wave_color)\$(get_flowing_liquid)${RESET}"
-# PS1+="${DARK_PURPLE}【${NEON_PINK}\u${DARK_PURPLE}】${RESET}"
-# PS1+="\$(get_wave_color)\$(get_liquid_wave)${RESET}"
-# PS1+="${DARK_PURPLE}【${NEON_PURPLE}\h${DARK_PURPLE}】${RESET} "
-# PS1+="\$(get_wave_color)\$(get_smooth_flow)${MINT_GREEN}\w\$(get_smooth_flow)${RESET} "
-# PS1+="${HOT_MAGENTA}\$(git_branch)${RESET}\n"
-# PS1+="\$(get_wave_color)╰─\$(get_flowing_liquid)▸${RESET} "
+    # Animated prompt symbol
+    PS1+="\$(get_wave_color)${BOLD}\$(get_smooth_flow)▸${RESET} "
+fi
 
 export PS1

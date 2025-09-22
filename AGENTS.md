@@ -1,12 +1,12 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- `vaporwave_bash_prompt`: primary Bash prompt theme with static neon palette and optional alternate layout.
+- `vaporwave_bash_prompt`: primary Bash prompt theme with static neon palette; honours `MYPROMPTS_PROMPT_STYLE=compact|extended`.
 - `vaporwave_liquid_prompt`: animated prompt variant; relies on Unicode wave frames and time-based color cycling.
 - `vaporwave_zsh_prompt`: Zsh-native prompt that mirrors the classic Bash layout, including git branch detection.
 - `vaporwave_lscolors`: exported `LS_COLORS` table that maps common extensions to the vaporwave colorway.
 - `vaporwave_ls_setup.sh`: legacy helper that only wires LS colors; retained for users who prefer manual sourcing.
-- `install.sh`: curl-friendly bootstrapper; downloads all assets into `~/.local/share/myprompts` and wires chosen shells.
+- `install.sh`: curl-friendly bootstrapper; detects existing installs, can purge and reinstall, and wires assets under `~/.local/share/myprompts`.
 
 ## Build, Test, and Development Commands
 - There is no compilation step; source prompt files directly during development:
@@ -20,6 +20,7 @@
   HOME=$(mktemp -d) BASE_URL="file://$PWD" INSTALL_ROOT="$HOME/.myprompts" \
   SHELL=/bin/bash bash ./install.sh
   ```
+- Non-interactive runs can pre-select variants, e.g. `PROMPT_VARIANT=liquid PROMPT_STYLE=extended ./install.sh`.
 - Apply the LS colors locally before shipping changes:
   ```bash
   cp vaporwave_lscolors ~/.vaporwave_lscolors
@@ -34,6 +35,7 @@
 
 ## Testing Guidelines
 - Validate prompts by sourcing the script in a fresh shell and confirming user, host, path, and git branch render correctly.
+- Exercise both `compact` and `extended` styles by toggling `MYPROMPTS_PROMPT_STYLE` prior to sourcing.
 - Exercise animated prompts in terminals that support 256 colors and Unicode; fall back gracefully in minimal TTYs.
 - For Zsh, ensure `setopt prompt_subst` is active and the prompt renders without layout drift on `%n`, `%m`, and `%~` substitutions.
 - After running `install.sh` (or sourcing `vaporwave_lscolors` directly), open a new session and check `ls -la --color=auto` for expected palette; the installer injects an `alias ls='ls --color=auto'` block when no alias exists.

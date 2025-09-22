@@ -27,6 +27,49 @@ require_command() {
   fi
 }
 
+existing_install_present() {
+  [[ -d $INSTALL_ROOT ]] && [[ -n $(ls -A "$INSTALL_ROOT" 2>/dev/null) ]]
+}
+
+handle_existing_install() {
+  if ! existing_install_present; then
+    return
+  fi
+
+  if (( INTERACTIVE )); then
+    cat <<NOTICE
+Existing myprompts files detected at ${INSTALL_ROOT/#$HOME/~}.
+  [R]einstall (clears existing files)
+  [C]ancel installation
+NOTICE
+
+    local response
+    while true; do
+      read -r -p "Choose an option [R/C]: " response
+      response=${response:-R}
+      response=${response,,}
+      case "$response" in
+        r|reinstall)
+          info "Removing previous installation."
+          rm -rf "$INSTALL_ROOT"
+          break
+          ;;
+
+        c|cancel)
+          info "Installation cancelled; existing setup left untouched."
+          exit 0
+          ;;
+        *)
+          echo "Please choose R to reinstall or C to cancel."
+          ;;
+      esac
+    done
+  else
+    warn "Existing installation detected; clearing $INSTALL_ROOT for reinstall."
+    rm -rf "$INSTALL_ROOT"
+  fi
+}
+
 prompt_yes_no() {
   local message=$1
   local default=${2:-Y}
@@ -57,7 +100,20 @@ prompt_yes_no() {
 }
 
 choose_prompt_variant() {
-  local choice
+  local preset=${MYPROMPTS_PROMPT_VARIANT:-${PROMPT_VARIANT:-}}
+  preset=${preset,,}
+  case "$preset" in
+    liquid|animated)
+      echo "$PROMPT_LIQUID"
+      return
+      ;;
+    classic|static|vaporwave)
+      echo "$PROMPT_STATIC"
+      return
+      ;;
+    "") ;;
+    *) warn "Unknown PROMPT_VARIANT '$preset'; falling back to interactive prompt." ;;
+  esac
 
   if (( ! INTERACTIVE )); then
     echo "$PROMPT_STATIC"
@@ -70,12 +126,52 @@ Select Bash prompt variant:
   [2] Vaporwave liquid (animated)
 CHOICES
 
+  local choice
   while true; do
     read -r -p "Enter choice [1/2]: " choice
     choice=${choice:-1}
     case "$choice" in
       1) echo "$PROMPT_STATIC"; return ;;
       2) echo "$PROMPT_LIQUID"; return ;;
+      *) echo "Please enter 1 or 2." ;;
+    esac
+  done
+}
+
+choose_prompt_style() {
+  local preset=${MYPROMPTS_PROMPT_STYLE:-${PROMPT_STYLE:-}}
+  preset=${preset,,}
+  case "$preset" in
+    extended|multi-line)
+      echo "extended"
+      return
+      ;;
+    compact|single-line|default)
+      echo "compact"
+      return
+      ;;
+    "") ;;
+    *) warn "Unknown PROMPT_STYLE '$preset'; falling back to interactive prompt." ;;
+  esac
+
+  if (( ! INTERACTIVE )); then
+    echo "compact"
+    return
+  fi
+
+  cat <<CHOICES
+Select prompt layout:
+  [1] Compact — single-line prompt
+  [2] Extended — multi-line prompt with decorative header
+CHOICES
+
+  local choice
+  while true; do
+    read -r -p "Enter choice [1/2]: " choice
+    choice=${choice:-1}
+    case "$choice" in
+      1) echo "compact"; return ;;
+      2) echo "extended"; return ;;
       *) echo "Please enter 1 or 2." ;;
     esac
   done
@@ -130,8 +226,18 @@ ensure_ls_alias() {
   append_block "$file" "$marker" "$alias_line"
 }
 
+write_prompt_style() {
+  local file=$1
+  local style=$2
+  local marker="# >>> myprompts prompt style >>>"
+  local line="export MYPROMPTS_PROMPT_STYLE=$style"
+  append_block "$file" "$marker" "$line"
+}
+
 main() {
   require_command curl
+
+  handle_existing_install
 
   info "Installing myprompts assets to ${INSTALL_ROOT/#$HOME/~}"
   mkdir -p "$INSTALL_ROOT"
@@ -141,19 +247,27 @@ main() {
   download_asset "$PROMPT_ZSH"
   download_asset "$LS_COLORS_FILE"
 
+  printf 'installed %s\n' "$(date -u +%FT%TZ)" >"$INSTALL_ROOT/.install-meta"
+
   local default_shell
   default_shell=$(basename "${SHELL:-bash}")
   info "Detected default shell: $default_shell"
 
   local configure_bash=0
   local configure_zsh=0
+  local prompt_style=""
 
   local bash_default="N"
   [[ $default_shell == bash ]] && bash_default="Y"
 
   if prompt_yes_no "Configure Bash prompt?" "$bash_default"; then
+    if [[ -z $prompt_style ]]; then
+      prompt_style=$(choose_prompt_style)
+      info "Using $prompt_style layout for prompts."
+    fi
     local bash_prompt_file
     bash_prompt_file=$(choose_prompt_variant)
+    write_prompt_style "$HOME/.bashrc" "$prompt_style"
     append_block "$HOME/.bashrc" "# >>> myprompts prompt >>>" "source \"$INSTALL_ROOT/$bash_prompt_file\""
     configure_bash=1
   fi
@@ -162,6 +276,11 @@ main() {
   [[ $default_shell == zsh ]] && zsh_default="Y"
 
   if prompt_yes_no "Configure Zsh prompt?" "$zsh_default"; then
+    if [[ -z $prompt_style ]]; then
+      prompt_style=$(choose_prompt_style)
+      info "Using $prompt_style layout for prompts."
+    fi
+    write_prompt_style "$HOME/.zshrc" "$prompt_style"
     append_block "$HOME/.zshrc" "# >>> myprompts prompt >>>" "[[ -f \"$INSTALL_ROOT/$PROMPT_ZSH\" ]] && source \"$INSTALL_ROOT/$PROMPT_ZSH\""
     configure_zsh=1
   fi

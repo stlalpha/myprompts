@@ -60,44 +60,44 @@ existing_install_present() {
   [[ -d $INSTALL_ROOT ]] && [[ -n $(ls -A "$INSTALL_ROOT" 2>/dev/null) ]]
 }
 
+describe_install_state() {
+  local target=$1
+  if [[ ! -d $target ]]; then
+    printf 'fresh install'
+    return
+  fi
+
+  if [[ -f $target/.install-meta ]]; then
+    local meta
+    meta=$(<"$target/.install-meta")
+    printf 'update of existing install (%s)' "$meta"
+  else
+    printf 'existing directory detected'
+  fi
+}
+
 handle_existing_install() {
   if ! existing_install_present; then
     return
   fi
 
-  if (( INTERACTIVE )); then
-    cat <<NOTICE
-Existing myprompts files detected at ${INSTALL_ROOT/#$HOME/~}.
-  [R]einstall (clears existing files)
-  [C]ancel installation
-NOTICE
+  local summary
+  summary=$(describe_install_state "$INSTALL_ROOT")
 
-    local response
-    while true; do
-      if ! read -r -u "$PROMPT_FD" -p "Choose an option [R/C]: " response; then
-        error "Failed to read response; aborting installation."
-        exit 1
-      fi
-      response=${response:-R}
-      response=${response,,}
-      case "$response" in
-        r|reinstall)
-          info "Removing previous installation."
-          rm -rf "$INSTALL_ROOT"
-          break
-          ;;
-        c|cancel)
-          info "Installation cancelled; existing setup left untouched."
-          exit 0
-          ;;
-        *)
-          echo "Please choose R to reinstall or C to cancel."
-          ;;
-      esac
-    done
-  else
-    error "Existing installation detected but no interactive terminal available to confirm removal."
+  if (( ! INTERACTIVE )); then
+    error "${summary^}; run interactively to confirm reinstall."
     exit 1
+  fi
+
+  printf '\nDetected %s at %s.\n' "$summary" "${INSTALL_ROOT/#$HOME/~}" >&"$PROMPT_FD"
+  printf 'Reinstall will remove and replace this directory.\n' >&"$PROMPT_FD"
+
+if prompt_yes_no "Proceed with reinstall?" N; then
+    info "Removing previous installation."
+    rm -rf "$INSTALL_ROOT"
+  else
+    info "Installation cancelled; existing setup left untouched."
+    exit 0
   fi
 }
 

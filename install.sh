@@ -143,15 +143,16 @@ choose_prompt_variant() {
     return
   fi
 
-  cat <<CHOICES
-Select Bash prompt variant:
-  [1] Vaporwave classic (static)
-  [2] Vaporwave liquid (animated)
+  cat <<'CHOICES'
+
+Prompt variant options:
+  [1] Classic – static vaporwave prompt
+  [2] Liquid – animated waveform prompt
 CHOICES
 
   local choice
   while true; do
-    if ! read -r -u "$PROMPT_FD" -p "Enter choice [1/2]: " choice; then
+    if ! read -r -u "$PROMPT_FD" -p "Select prompt variant [1-2]: " choice; then
       warn "Could not read response; defaulting to 1."
       choice=1
     fi
@@ -185,15 +186,16 @@ choose_prompt_style() {
     return
   fi
 
-  cat <<CHOICES
-Select prompt layout:
-  [1] Compact — single-line prompt
-  [2] Extended — multi-line prompt with decorative header
+  cat <<'CHOICES'
+
+Prompt layout options:
+  [1] Compact – single-line prompt
+  [2] Extended – multi-line prompt with decorative header
 CHOICES
 
   local choice
   while true; do
-    if ! read -r -u "$PROMPT_FD" -p "Enter choice [1/2]: " choice; then
+    if ! read -r -u "$PROMPT_FD" -p "Select prompt layout [1-2]: " choice; then
       warn "Could not read response; defaulting to 1."
       choice=1
     fi

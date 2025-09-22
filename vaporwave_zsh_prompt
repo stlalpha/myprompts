@@ -1,0 +1,45 @@
+#!/usr/bin/env zsh
+
+# Vaporwave Dark Mode Zsh Prompt
+# Mirrors the Bash variant with neon vaporwave colors and Unicode accents.
+
+setopt prompt_subst               # Enable \$(...) evaluation during prompt rendering
+autoload -Uz colors && colors      # Load zsh color definitions
+
+# Prompt formatting helpers (zsh automatically treats these as zero width)
+RESET="%f%k%b"
+BOLD="%B"
+
+# Vaporwave color palette
+NEON_PINK="%F{198}"
+NEON_PURPLE="%F{141}"
+NEON_CYAN="%F{51}"
+NEON_BLUE="%F{39}"
+SUNSET_ORANGE="%F{209}"
+MINT_GREEN="%F{85}"
+DARK_PURPLE="%F{93}"
+HOT_MAGENTA="%F{201}"
+
+# Background colors
+BG_DARK="%K{234}"
+
+# Git branch helper shown as 『branch』 when inside a repository
+prompt_vaporwave_git_branch() {
+  local branch
+  branch=$(git symbolic-ref --short HEAD 2>/dev/null) || \
+    branch=$(git rev-parse --short HEAD 2>/dev/null) || return
+  printf '『%s』' "$branch"
+}
+
+PROMPT="${BG_DARK}${NEON_PINK}◤${NEON_CYAN}%n${DARK_PURPLE}@${NEON_PURPLE}%m${NEON_PINK}◢%k%f "
+PROMPT+="${SUNSET_ORANGE}【${MINT_GREEN}%~${SUNSET_ORANGE}】${RESET} "
+PROMPT+="${HOT_MAGENTA}\$(prompt_vaporwave_git_branch)${RESET} "
+PROMPT+="${NEON_BLUE}${BOLD}▸${RESET} "
+
+# Uncomment the block below for an alternate multi-line prompt aesthetic
+# PROMPT="${DARK_PURPLE}【${NEON_PINK}%n${DARK_PURPLE}】${RESET}"
+# PROMPT+="${NEON_CYAN}◆${RESET}"
+# PROMPT+="${DARK_PURPLE}【${NEON_PURPLE}%m${DARK_PURPLE}】${RESET} "
+# PROMPT+="${MINT_GREEN}➤ ${NEON_BLUE}%~${RESET} "
+# PROMPT+="${HOT_MAGENTA}\$(prompt_vaporwave_git_branch)${RESET}\n"
+# PROMPT+="${SUNSET_ORANGE}╰─▸${RESET} "

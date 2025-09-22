@@ -1,0 +1,112 @@
+#!/bin/bash
+
+# Vaporwave Liquid Animation Bash Prompt
+# Creates a flowing, liquid-like animation effect using wave characters
+
+# Color definitions
+RESET='\[\033[0m\]'
+BOLD='\[\033[1m\]'
+
+# Vaporwave color palette with gradients
+NEON_PINK='\[\033[38;5;198m\]'
+NEON_PURPLE='\[\033[38;5;141m\]'
+NEON_CYAN='\[\033[38;5;51m\]'
+NEON_BLUE='\[\033[38;5;39m\]'
+SUNSET_ORANGE='\[\033[38;5;209m\]'
+MINT_GREEN='\[\033[38;5;85m\]'
+DARK_PURPLE='\[\033[38;5;93m\]'
+HOT_MAGENTA='\[\033[38;5;201m\]'
+
+# Gradient colors for liquid effect
+WAVE1='\[\033[38;5;45m\]'   # Turquoise
+WAVE2='\[\033[38;5;87m\]'   # Light cyan
+WAVE3='\[\033[38;5;123m\]'  # Light blue
+WAVE4='\[\033[38;5;159m\]'  # Pale blue
+
+# Background
+BG_DARK='\[\033[48;5;234m\]'
+
+# Wave animation frames - creates a liquid motion effect
+# Using various Unicode characters for fluid appearance
+declare -a WAVE_FRAMES=(
+    "≈≋≈≋≈"
+    "≋≈≋≈≋"
+    "≈≋≈≋≈"
+    "≋≈≋≈≋"
+)
+
+declare -a LIQUID_FRAMES=(
+    "∼∽∼∽∼"
+    "∽∼∽∼∽"
+    "∼∽∼∽∼"
+    "∽∼∽∼∽"
+)
+
+declare -a FLOW_FRAMES=(
+    "～〜～〜～"
+    "〜～〜～〜"
+    "～〜～〜～"
+    "〜～〜～〜"
+)
+
+# Function to get git branch
+git_branch() {
+    git branch 2> /dev/null | sed -e '/^[^*]/d' -e 's/* \(.*\)/『\1』/'
+}
+
+# Function to get liquid animation based on time
+get_liquid_wave() {
+    # Use nanoseconds for smoother animation
+    local ns=$(date +%N)
+    local frame_index=$((ns / 250000000 % 4))  # Change every 250ms
+    echo "${WAVE_FRAMES[$frame_index]}"
+}
+
+get_flowing_liquid() {
+    local ns=$(date +%N)
+    local frame_index=$((ns / 300000000 % 4))  # Change every 300ms
+    echo "${LIQUID_FRAMES[$frame_index]}"
+}
+
+get_smooth_flow() {
+    local ns=$(date +%N)
+    local frame_index=$((ns / 200000000 % 4))  # Change every 200ms
+    echo "${FLOW_FRAMES[$frame_index]}"
+}
+
+# Dynamic color shift based on time for liquid effect
+get_wave_color() {
+    local ns=$(date +%N)
+    local color_index=$((ns / 500000000 % 4))  # Change every 500ms
+    case $color_index in
+        0) echo "${WAVE1}" ;;
+        1) echo "${WAVE2}" ;;
+        2) echo "${WAVE3}" ;;
+        3) echo "${WAVE4}" ;;
+    esac
+}
+
+# Main prompt with liquid animation
+# The $(command) syntax ensures it's evaluated each time the prompt is displayed
+PS1="${BG_DARK}${NEON_PINK}◤${NEON_CYAN}\u${DARK_PURPLE}@${NEON_PURPLE}\h${NEON_PINK}◢${RESET} "
+
+# Animated liquid waves around the path
+PS1+="\$(get_wave_color)\$(get_liquid_wave)${MINT_GREEN}\w\$(get_wave_color)\$(get_liquid_wave)${RESET} "
+
+# Git branch with flowing effect
+PS1+="${HOT_MAGENTA}\$(git_branch)${RESET} "
+
+# Animated prompt symbol
+PS1+="\$(get_wave_color)${BOLD}\$(get_smooth_flow)▸${RESET} "
+
+# Alternative design with more liquid elements
+# Uncomment for a different style
+# PS1="\$(get_wave_color)\$(get_flowing_liquid)${RESET}"
+# PS1+="${DARK_PURPLE}【${NEON_PINK}\u${DARK_PURPLE}】${RESET}"
+# PS1+="\$(get_wave_color)\$(get_liquid_wave)${RESET}"
+# PS1+="${DARK_PURPLE}【${NEON_PURPLE}\h${DARK_PURPLE}】${RESET} "
+# PS1+="\$(get_wave_color)\$(get_smooth_flow)${MINT_GREEN}\w\$(get_smooth_flow)${RESET} "
+# PS1+="${HOT_MAGENTA}\$(git_branch)${RESET}\n"
+# PS1+="\$(get_wave_color)╰─\$(get_flowing_liquid)▸${RESET} "
+
+export PS1

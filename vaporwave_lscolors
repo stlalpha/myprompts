@@ -1,0 +1,139 @@
+#!/bin/bash
+# ╔══════════════════════════════════════════════════════════════╗
+# ║  V A P O R W A V E   L S _ C O L O R S   A E S T H E T I C  ║
+# ╚══════════════════════════════════════════════════════════════╝
+
+# Reset
+LS_COLORS='rs=0:di=38;5;141;1:ln=38;5;183;3:mh=00:pi=38;5;226;48;5;54:so=38;5;219;1'
+
+# File types with vaporwave colors
+LS_COLORS="${LS_COLORS}:bd=38;5;183;48;5;91;1:cd=38;5;225;48;5;56;1"
+LS_COLORS="${LS_COLORS}:or=38;5;197;48;5;232;9:mi=38;5;199;48;5;232;9:su=37;41:sg=30;43"
+LS_COLORS="${LS_COLORS}:ca=30;41:tw=30;42:ow=38;5;141;48;5;91"
+LS_COLORS="${LS_COLORS}:st=37;44:ex=38;5;212;1"
+
+# Archives - Hot Pink/Magenta gradient
+LS_COLORS="${LS_COLORS}:*.tar=38;5;199;1:*.tgz=38;5;199;1:*.arc=38;5;199;1"
+LS_COLORS="${LS_COLORS}:*.arj=38;5;199;1:*.taz=38;5;199;1:*.lha=38;5;199;1"
+LS_COLORS="${LS_COLORS}:*.lz4=38;5;199;1:*.lzh=38;5;199;1:*.lzma=38;5;199;1"
+LS_COLORS="${LS_COLORS}:*.tlz=38;5;199;1:*.txz=38;5;199;1:*.tzo=38;5;199;1"
+LS_COLORS="${LS_COLORS}:*.t7z=38;5;199;1:*.zip=38;5;205;1:*.z=38;5;199;1"
+LS_COLORS="${LS_COLORS}:*.dz=38;5;199;1:*.gz=38;5;199;1:*.lrz=38;5;199;1"
+LS_COLORS="${LS_COLORS}:*.lz=38;5;199;1:*.lzo=38;5;199;1:*.xz=38;5;199;1"
+LS_COLORS="${LS_COLORS}:*.zst=38;5;199;1:*.tzst=38;5;199;1:*.bz2=38;5;199;1"
+LS_COLORS="${LS_COLORS}:*.bz=38;5;199;1:*.tbz=38;5;199;1:*.tbz2=38;5;199;1"
+LS_COLORS="${LS_COLORS}:*.tz=38;5;199;1:*.deb=38;5;205;1:*.rpm=38;5;205;1"
+LS_COLORS="${LS_COLORS}:*.jar=38;5;205;1:*.war=38;5;205;1:*.ear=38;5;205;1"
+LS_COLORS="${LS_COLORS}:*.sar=38;5;205;1:*.rar=38;5;205;1:*.alz=38;5;205;1"
+LS_COLORS="${LS_COLORS}:*.ace=38;5;205;1:*.zoo=38;5;205;1:*.cpio=38;5;205;1"
+LS_COLORS="${LS_COLORS}:*.7z=38;5;205;1:*.rz=38;5;205;1:*.cab=38;5;205;1"
+LS_COLORS="${LS_COLORS}:*.wim=38;5;205;1:*.swm=38;5;205;1:*.dwm=38;5;205;1"
+LS_COLORS="${LS_COLORS}:*.esd=38;5;205;1"
+
+# Images - Cyan/Aqua aesthetic
+LS_COLORS="${LS_COLORS}:*.jpg=38;5;87;3:*.jpeg=38;5;87;3:*.mjpg=38;5;87;3"
+LS_COLORS="${LS_COLORS}:*.mjpeg=38;5;87;3:*.gif=38;5;87;3:*.bmp=38;5;87;3"
+LS_COLORS="${LS_COLORS}:*.pbm=38;5;87;3:*.pgm=38;5;87;3:*.ppm=38;5;87;3"
+LS_COLORS="${LS_COLORS}:*.tga=38;5;87;3:*.xbm=38;5;87;3:*.xpm=38;5;87;3"
+LS_COLORS="${LS_COLORS}:*.tif=38;5;87;3:*.tiff=38;5;87;3:*.png=38;5;123;3"
+LS_COLORS="${LS_COLORS}:*.svg=38;5;123;3:*.svgz=38;5;123;3:*.mng=38;5;123;3"
+LS_COLORS="${LS_COLORS}:*.pcx=38;5;87;3:*.mov=38;5;87;3:*.mpg=38;5;87;3"
+LS_COLORS="${LS_COLORS}:*.mpeg=38;5;87;3:*.m2v=38;5;87;3:*.mkv=38;5;87;3"
+LS_COLORS="${LS_COLORS}:*.webm=38;5;87;3:*.webp=38;5;87;3:*.ogm=38;5;87;3"
+LS_COLORS="${LS_COLORS}:*.mp4=38;5;87;3:*.m4v=38;5;87;3:*.mp4v=38;5;87;3"
+LS_COLORS="${LS_COLORS}:*.vob=38;5;87;3:*.qt=38;5;87;3:*.nuv=38;5;87;3"
+LS_COLORS="${LS_COLORS}:*.wmv=38;5;87;3:*.asf=38;5;87;3:*.rm=38;5;87;3"
+LS_COLORS="${LS_COLORS}:*.rmvb=38;5;87;3:*.flc=38;5;87;3:*.avi=38;5;87;3"
+LS_COLORS="${LS_COLORS}:*.fli=38;5;87;3:*.flv=38;5;87;3:*.gl=38;5;87;3"
+LS_COLORS="${LS_COLORS}:*.dl=38;5;87;3:*.xcf=38;5;87;3:*.xwd=38;5;87;3"
+LS_COLORS="${LS_COLORS}:*.yuv=38;5;87;3:*.cgm=38;5;87;3:*.emf=38;5;87;3"
+LS_COLORS="${LS_COLORS}:*.ogv=38;5;87;3:*.ogx=38;5;87;3"
+
+# Audio - Purple/Violet vibes
+LS_COLORS="${LS_COLORS}:*.aac=38;5;141;3:*.au=38;5;141;3:*.flac=38;5;141;3"
+LS_COLORS="${LS_COLORS}:*.m4a=38;5;141;3:*.mid=38;5;141;3:*.midi=38;5;141;3"
+LS_COLORS="${LS_COLORS}:*.mka=38;5;141;3:*.mp3=38;5;177;3:*.mpc=38;5;141;3"
+LS_COLORS="${LS_COLORS}:*.ogg=38;5;141;3:*.ra=38;5;141;3:*.wav=38;5;141;3"
+LS_COLORS="${LS_COLORS}:*.oga=38;5;141;3:*.opus=38;5;141;3:*.spx=38;5;141;3"
+LS_COLORS="${LS_COLORS}:*.xspf=38;5;141;3"
+
+# Documents - Soft Pink gradient
+LS_COLORS="${LS_COLORS}:*.doc=38;5;218:*.docx=38;5;218:*.odt=38;5;218"
+LS_COLORS="${LS_COLORS}:*.pdf=38;5;225;1:*.ps=38;5;225:*.eps=38;5;225"
+LS_COLORS="${LS_COLORS}:*.ppt=38;5;218:*.pptx=38;5;218:*.odp=38;5;218"
+LS_COLORS="${LS_COLORS}:*.xls=38;5;218:*.xlsx=38;5;218:*.ods=38;5;218"
+LS_COLORS="${LS_COLORS}:*.csv=38;5;218:*.tex=38;5;218:*.djvu=38;5;218"
+LS_COLORS="${LS_COLORS}:*.epub=38;5;218"
+
+# Programming - Neon Yellow/Green
+LS_COLORS="${LS_COLORS}:*.c=38;5;190;1:*.cc=38;5;190;1:*.cpp=38;5;190;1"
+LS_COLORS="${LS_COLORS}:*.cxx=38;5;190;1:*.h=38;5;154:*.hh=38;5;154"
+LS_COLORS="${LS_COLORS}:*.hpp=38;5;154:*.hxx=38;5;154"
+LS_COLORS="${LS_COLORS}:*.py=38;5;226;1:*.pyc=38;5;220:*.pyo=38;5;220"
+LS_COLORS="${LS_COLORS}:*.js=38;5;226;1:*.ts=38;5;226;1:*.jsx=38;5;226;1"
+LS_COLORS="${LS_COLORS}:*.tsx=38;5;226;1:*.mjs=38;5;226;1:*.cjs=38;5;226;1"
+LS_COLORS="${LS_COLORS}:*.java=38;5;220;1:*.class=38;5;214"
+LS_COLORS="${LS_COLORS}:*.rb=38;5;197;1:*.erb=38;5;197:*.rake=38;5;197"
+LS_COLORS="${LS_COLORS}:*.php=38;5;147;1:*.phtml=38;5;147"
+LS_COLORS="${LS_COLORS}:*.go=38;5;123;1:*.rs=38;5;208;1:*.swift=38;5;208;1"
+LS_COLORS="${LS_COLORS}:*.kt=38;5;141;1:*.kts=38;5;141;1"
+LS_COLORS="${LS_COLORS}:*.scala=38;5;196;1:*.clj=38;5;155;1"
+LS_COLORS="${LS_COLORS}:*.lua=38;5;105;1:*.perl=38;5;147;1:*.pl=38;5;147;1"
+LS_COLORS="${LS_COLORS}:*.sh=38;5;212;1:*.bash=38;5;212;1:*.zsh=38;5;212;1"
+LS_COLORS="${LS_COLORS}:*.fish=38;5;212;1:*.vim=38;5;148;1"
+LS_COLORS="${LS_COLORS}:*.el=38;5;177;1:*.lisp=38;5;177;1"
+LS_COLORS="${LS_COLORS}:*.hs=38;5;141;1:*.ml=38;5;214;1:*.r=38;5;123;1"
+LS_COLORS="${LS_COLORS}:*.R=38;5;123;1:*.sql=38;5;222;1"
+
+# Web - Electric Blue/Pink
+LS_COLORS="${LS_COLORS}:*.html=38;5;207;1:*.htm=38;5;207;1:*.shtml=38;5;207;1"
+LS_COLORS="${LS_COLORS}:*.css=38;5;183;1:*.scss=38;5;183;1:*.sass=38;5;183;1"
+LS_COLORS="${LS_COLORS}:*.less=38;5;183;1:*.xml=38;5;171;1:*.json=38;5;177;1"
+LS_COLORS="${LS_COLORS}:*.yaml=38;5;177;1:*.yml=38;5;177;1:*.toml=38;5;177;1"
+LS_COLORS="${LS_COLORS}:*.ini=38;5;177;1:*.conf=38;5;177;1:*.config=38;5;177;1"
+
+# Configs/RC files - Soft Purple
+LS_COLORS="${LS_COLORS}:*rc=38;5;147:*.bashrc=38;5;147:*.zshrc=38;5;147"
+LS_COLORS="${LS_COLORS}:*.vimrc=38;5;147:*.gitconfig=38;5;147:*.gitignore=38;5;147"
+LS_COLORS="${LS_COLORS}:*.dockerignore=38;5;147:*.editorconfig=38;5;147"
+LS_COLORS="${LS_COLORS}:*.eslintrc=38;5;147:*.prettierrc=38;5;147"
+
+# Build files - Orange/Pink sunset
+LS_COLORS="${LS_COLORS}:*Makefile=38;5;209;1:*makefile=38;5;209;1"
+LS_COLORS="${LS_COLORS}:*CMakeLists.txt=38;5;209;1:*Dockerfile=38;5;209;1"
+LS_COLORS="${LS_COLORS}:*docker-compose.yml=38;5;209;1:*package.json=38;5;215;1"
+LS_COLORS="${LS_COLORS}:*package-lock.json=38;5;208:*yarn.lock=38;5;208"
+LS_COLORS="${LS_COLORS}:*Gemfile=38;5;197;1:*Gemfile.lock=38;5;196"
+LS_COLORS="${LS_COLORS}:*Cargo.toml=38;5;208;1:*Cargo.lock=38;5;202"
+LS_COLORS="${LS_COLORS}:*go.mod=38;5;123;1:*go.sum=38;5;117"
+LS_COLORS="${LS_COLORS}:*requirements.txt=38;5;226;1:*Pipfile=38;5;226;1"
+LS_COLORS="${LS_COLORS}:*poetry.lock=38;5;220:*composer.json=38;5;147;1"
+LS_COLORS="${LS_COLORS}:*composer.lock=38;5;141"
+
+# Markdown/Text - Dreamy pastels
+LS_COLORS="${LS_COLORS}:*.md=38;5;225:*.markdown=38;5;225:*.rst=38;5;225"
+LS_COLORS="${LS_COLORS}:*.txt=38;5;231:*.text=38;5;231:*.log=38;5;246;3"
+LS_COLORS="${LS_COLORS}:*.msg=38;5;231:*.org=38;5;225:*.pod=38;5;225"
+LS_COLORS="${LS_COLORS}:*.tex=38;5;225:*.ltx=38;5;225:*.latex=38;5;225"
+
+# README files - Special neon glow
+LS_COLORS="${LS_COLORS}:*README=38;5;226;48;5;54;1:*README.md=38;5;226;48;5;54;1"
+LS_COLORS="${LS_COLORS}:*README.txt=38;5;226;48;5;54;1:*readme=38;5;226;48;5;54;1"
+LS_COLORS="${LS_COLORS}:*LICENSE=38;5;220;48;5;234;1:*COPYING=38;5;220;48;5;234;1"
+LS_COLORS="${LS_COLORS}:*COPYRIGHT=38;5;220;48;5;234;1:*AUTHORS=38;5;183;1"
+LS_COLORS="${LS_COLORS}:*CONTRIBUTORS=38;5;183;1:*CHANGELOG=38;5;183;1"
+LS_COLORS="${LS_COLORS}:*HISTORY=38;5;183;1:*NEWS=38;5;183;1"
+LS_COLORS="${LS_COLORS}:*TODO=38;5;199;48;5;234;1:*TODO.md=38;5;199;48;5;234;1"
+LS_COLORS="${LS_COLORS}:*INSTALL=38;5;148;1:*MANIFEST=38;5;148;1"
+
+# Version control - Neon Green/Pink
+LS_COLORS="${LS_COLORS}:*.git=38;5;197;48;5;234:*.gitattributes=38;5;197"
+LS_COLORS="${LS_COLORS}:*.gitmodules=38;5;197:*.svn=38;5;208:*.hg=38;5;208"
+
+# Backup files - Faded retro
+LS_COLORS="${LS_COLORS}:*~=38;5;244;3:*.bak=38;5;244;3:*.old=38;5;244;3"
+LS_COLORS="${LS_COLORS}:*.orig=38;5;244;3:*.swp=38;5;244;3:*.tmp=38;5;244;3"
+LS_COLORS="${LS_COLORS}:*.cache=38;5;244;3"
+
+export LS_COLORS
+

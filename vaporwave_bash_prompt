@@ -1,0 +1,46 @@
+#!/bin/bash
+
+# Vaporwave Dark Mode Bash Prompt
+# Colors inspired by 80s/90s aesthetics, neon lights, and synthwave
+
+# Color definitions (using 256-color codes for better compatibility)
+RESET='\[\033[0m\]'
+BOLD='\[\033[1m\]'
+
+# Vaporwave color palette
+NEON_PINK='\[\033[38;5;198m\]'      # Hot pink
+NEON_PURPLE='\[\033[38;5;141m\]'    # Light purple
+NEON_CYAN='\[\033[38;5;51m\]'       # Bright cyan
+NEON_BLUE='\[\033[38;5;39m\]'       # Electric blue
+SUNSET_ORANGE='\[\033[38;5;209m\]'  # Sunset orange
+MINT_GREEN='\[\033[38;5;85m\]'      # Mint/seafoam
+DARK_PURPLE='\[\033[38;5;93m\]'     # Deep purple
+HOT_MAGENTA='\[\033[38;5;201m\]'    # Magenta
+
+# Background colors for that terminal aesthetic
+BG_DARK='\[\033[48;5;234m\]'        # Very dark gray background
+BG_PURPLE='\[\033[48;5;54m\]'       # Dark purple background
+
+# Function to get git branch if in a git repo
+git_branch() {
+    git branch 2> /dev/null | sed -e '/^[^*]/d' -e 's/* \(.*\)/『\1』/'
+}
+
+# Vaporwave-style prompt with Japanese aesthetic elements
+# Format: ◤user@host◢ 【path】 『git』 ▸
+PS1="${BG_DARK}${NEON_PINK}◤${NEON_CYAN}\u${DARK_PURPLE}@${NEON_PURPLE}\h${NEON_PINK}◢${RESET} "
+PS1+="${SUNSET_ORANGE}【${MINT_GREEN}\w${SUNSET_ORANGE}】${RESET} "
+PS1+="${HOT_MAGENTA}\$(git_branch)${RESET} "
+PS1+="${NEON_BLUE}${BOLD}▸${RESET} "
+
+# Alternative design with more vaporwave elements
+# Uncomment to use this version instead
+# PS1="${DARK_PURPLE}【${NEON_PINK}\u${DARK_PURPLE}】${RESET}"
+# PS1+="${NEON_CYAN}◆${RESET}"
+# PS1+="${DARK_PURPLE}【${NEON_PURPLE}\h${DARK_PURPLE}】${RESET} "
+# PS1+="${MINT_GREEN}➤ ${NEON_BLUE}\w${RESET} "
+# PS1+="${HOT_MAGENTA}\$(git_branch)${RESET}\n"
+# PS1+="${SUNSET_ORANGE}╰─▸${RESET} "
+
+# Export the prompt
+export PS1

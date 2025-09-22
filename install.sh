@@ -58,8 +58,8 @@ print_header() {
 
   cat <<BANNER
 ${pink}╔════════════════════════════════════════════════════════════╗${reset}
-${pink}║${reset}  ${cyan}Spaceman's Auto-Personalizer${reset} ${purple}v0.1b${reset}                ${pink}║${reset}
-${pink}║${reset}  ${blue}Bootstrapping vaporwave shell and LS aesthetic...${reset}  ${pink}║${reset}
+${pink}║${reset}  ${cyan}Spaceman's Auto-Personalizer${reset} ${purple}v0.1b${reset}                    ${pink}║${reset}
+${pink}║${reset}  ${blue}Bootstrapping vaporwave shell and LS aesthetic...${reset}      ${pink}║${reset}
 ${pink}╚════════════════════════════════════════════════════════════╝${reset}
 BANNER
 }

@@ -49,6 +49,21 @@ info()  { printf '\e[1;36m[info]\e[0m %s\n' "$*"; }
 warn()  { printf '\e[1;33m[warn]\e[0m %s\n' "$*"; }
 error() { printf '\e[1;31m[fail]\e[0m %s\n' "$*" >&2; }
 
+print_header() {
+  local reset=$'\033[0m'
+  local pink=$'\033[38;5;198m'
+  local cyan=$'\033[38;5;51m'
+  local purple=$'\033[38;5;141m'
+  local blue=$'\033[38;5;39m'
+
+  cat <<BANNER
+${pink}╔════════════════════════════════════════════════════════════╗${reset}
+${pink}║${reset}  ${cyan}Spaceman's Auto-Personalizer${reset} ${purple}v0.1b${reset}                    ${pink}║${reset}
+${pink}║${reset}  ${blue}Bootstrapping vaporwave shell and LS aesthetic...${reset}  ${pink}║${reset}
+${pink}╚════════════════════════════════════════════════════════════╝${reset}
+BANNER
+}
+
 require_command() {
   if ! command -v "$1" >/dev/null 2>&1; then
     error "Missing required command '$1'. Please install it and rerun." 
@@ -326,6 +341,8 @@ write_prompt_style() {
 
 main() {
   require_command curl
+
+  print_header
 
   handle_existing_install
 

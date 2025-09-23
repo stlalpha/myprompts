@@ -15,6 +15,21 @@ CONFIG_TMP_DIR=$(mktemp -d 2>/dev/null || mktemp -d -t myprompts)
 PACKAGES_CONFIG_URL="$BASE_URL/config/packages.sh"
 ALIASES_CONFIG_URL="$BASE_URL/config/aliases.sh"
 
+VW_RESET=$'\033[0m'
+VW_PINK=$'\033[38;5;198m'
+VW_CYAN=$'\033[38;5;51m'
+VW_PURPLE=$'\033[38;5;141m'
+VW_BLUE=$'\033[38;5;39m'
+VW_ORANGE=$'\033[38;5;209m'
+VW_GREEN=$'\033[38;5;85m'
+VW_MAGENTA=$'\033[38;5;201m'
+VW_GRAY=$'\033[38;5;244m'
+VW_SECTION_ICON='✦'
+VW_ITEM_ICON='▹'
+VW_INSTALLED_ICON='✧'
+VW_TOP_BORDER='.0Oo............................................................oO0>'
+VW_BOTTOM_BORDER='<0Oo............................................................oO0.'
+
 INTERACTIVE=0
 PROMPT_FD=0
 TTY_FD_OPENED=0
@@ -57,19 +72,38 @@ warn()  { printf '\e[1;33m[warn]\e[0m %s\n' "$*"; }
 error() { printf '\e[1;31m[fail]\e[0m %s\n' "$*" >&2; }
 
 print_header() {
-  local reset=$'\033[0m'
-  local pink=$'\033[38;5;198m'
-  local cyan=$'\033[38;5;51m'
-  local purple=$'\033[38;5;141m'
-  local blue=$'\033[38;5;39m'
+  printf '%b%s%b\n' "$VW_PINK" "$VW_TOP_BORDER" "$VW_RESET"
+  printf "  %bSpaceman's Auto-Personalizer%b %bv0.1b%b\n" "$VW_CYAN" "$VW_RESET" "$VW_PURPLE" "$VW_RESET"
+  printf "  %bBootstrapping vaporwave shell and LS aesthetic...%b\n" "$VW_BLUE" "$VW_RESET"
+  printf '%b%s%b\n' "$VW_PINK" "$VW_BOTTOM_BORDER" "$VW_RESET"
+}
 
-  local top=".0Oo............................................................oO0>"
-  local bottom="<0Oo............................................................oO0."
+print_pkg_group() {
+  local label=$1
+  local array_name=$2
+  local color=$3
+  local packages=()
+  eval "packages=(\"\${${array_name}[@]}\")"
 
-  printf '%b%s%b\n' "$pink" "$top" "$reset"
-  printf "  %bSpaceman's Auto-Personalizer%b %bv0.1b%b\n" "$cyan" "$reset" "$purple" "$reset"
-  printf "  %bBootstrapping vaporwave shell and LS aesthetic...%b\n" "$blue" "$reset"
-  printf '%b%s%b\n' "$pink" "$bottom" "$reset"
+  if [[ ${#packages[@]} -gt 0 ]]; then
+    printf '    %b%s%b %b%s:%b %b%s%b\n' \
+      "$VW_PINK" "$VW_ITEM_ICON" "$VW_RESET" "$color" "$label" "$VW_RESET" "$color" "${packages[*]}" "$VW_RESET"
+  else
+    printf '    %b%s%b %b%s:%b %b<none>%b\n' \
+      "$VW_PINK" "$VW_ITEM_ICON" "$VW_RESET" "$color" "$label" "$VW_RESET" "$VW_GRAY" "$VW_RESET"
+  fi
+}
+
+print_installed_items() {
+  local detected=$1
+  if [[ -n $detected ]]; then
+    while IFS= read -r line; do
+      [[ -z $line ]] && continue
+      printf '    %b%s%b %b%s%b\n' "$VW_PINK" "$VW_INSTALLED_ICON" "$VW_RESET" "$VW_GREEN" "$line" "$VW_RESET"
+    done <<< "$detected"
+  else
+    printf '    %b%s%b %b<none detected>%b\n' "$VW_PINK" "$VW_INSTALLED_ICON" "$VW_RESET" "$VW_GRAY" "$VW_RESET"
+  fi
 }
 
 ensure_array() {
@@ -379,43 +413,57 @@ handle_package_bootstrap() {
   fi
 
   local mgr=""
+  local mgr_label=""
   if [[ $os == linux ]]; then
     mgr=$(detect_linux_package_manager)
+    case "$mgr" in
+      apt) mgr_label="apt" ;;
+      dnf) mgr_label="dnf" ;;
+      pacman)
+        if command -v paru >/dev/null 2>&1; then
+          mgr_label="pacman + paru"
+        else
+          mgr_label="pacman"
+        fi
+        ;;
+      *) mgr_label="unknown" ;;
+    esac
+  else
+    mgr_label="Homebrew"
   fi
 
-  printf '\nPackage configuration for %s:\n' "${os^}" >&"$PROMPT_FD"
+  printf '\n%b%s%b %bPackage Setup%b for %s (%s)%b\n' \
+    "$VW_PINK" "$VW_SECTION_ICON" "$VW_RESET" "$VW_CYAN" "$VW_RESET" "${os^}" "$mgr_label" "$VW_RESET" >&"$PROMPT_FD"
+
   case "$os" in
     macos)
-      printf '  brew formulae: %s\n' "${macos_brew_formulae[*]:-<none>}" >&"$PROMPT_FD"
-      printf '  brew casks: %s\n' "${macos_brew_casks[*]:-<none>}" >&"$PROMPT_FD"
+      print_pkg_group 'brew formulae' macos_brew_formulae "$VW_ORANGE" >&"$PROMPT_FD"
+      print_pkg_group 'brew casks' macos_brew_casks "$VW_PURPLE" >&"$PROMPT_FD"
       ;;
     linux)
       case "$mgr" in
         apt)
-          printf '  apt packages: %s\n' "${linux_apt_packages[*]:-<none>}" >&"$PROMPT_FD"
+          print_pkg_group 'apt packages' linux_apt_packages "$VW_ORANGE" >&"$PROMPT_FD"
           ;;
         dnf)
-          printf '  dnf packages: %s\n' "${linux_dnf_packages[*]:-<none>}" >&"$PROMPT_FD"
+          print_pkg_group 'dnf packages' linux_dnf_packages "$VW_ORANGE" >&"$PROMPT_FD"
           ;;
         pacman)
-          printf '  pacman packages: %s\n' "${linux_pacman_packages[*]:-<none>}" >&"$PROMPT_FD"
-          printf '  paru packages: %s\n' "${linux_paru_packages[*]:-<none>}" >&"$PROMPT_FD"
+          print_pkg_group 'pacman packages' linux_pacman_packages "$VW_ORANGE" >&"$PROMPT_FD"
+          print_pkg_group 'paru packages' linux_paru_packages "$VW_MAGENTA" >&"$PROMPT_FD"
           ;;
         *)
-          printf '  <package manager not detected>\n' >&"$PROMPT_FD"
+          printf '    %b%s%b %b<package manager not detected>%b\n' \
+            "$VW_PINK" "$VW_ITEM_ICON" "$VW_RESET" "$VW_GRAY" "$VW_RESET" >&"$PROMPT_FD"
           ;;
       esac
       ;;
   esac
 
-  printf '\nAlready installed (best-effort detection):\n' >&"$PROMPT_FD"
+  printf '\n%b%s%b %bAlready installed%b\n' "$VW_PINK" "$VW_SECTION_ICON" "$VW_RESET" "$VW_CYAN" "$VW_RESET" >&"$PROMPT_FD"
   local detected
   detected=$(detect_installed_packages "$os" "$mgr") || detected=""
-  if [[ -n $detected ]]; then
-    printf '  %s\n' "${detected//$'\n'/\n  }" >&"$PROMPT_FD"
-  else
-    printf '  <none detected>\n' >&"$PROMPT_FD"
-  fi
+  print_installed_items "$detected" >&"$PROMPT_FD"
 
   local default_answer=N
   if packages_already_configured; then

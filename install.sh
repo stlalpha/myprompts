@@ -195,6 +195,7 @@ install_pacman_packages() {
 
 perform_os_bootstrap() {
   local os=$1
+  local mgr=${2:-}
   case "$os" in
     macos)
       ensure_homebrew
@@ -202,8 +203,7 @@ perform_os_bootstrap() {
       install_brew_casks "${macos_brew_casks[@]}"
       ;;
     linux)
-      local mgr
-      mgr=$(detect_linux_package_manager)
+      [[ -z $mgr ]] && mgr=$(detect_linux_package_manager)
       case "$mgr" in
         apt) install_apt_packages "${linux_apt_packages[@]}" ;;
         dnf) install_dnf_packages "${linux_dnf_packages[@]}" ;;
@@ -219,43 +219,42 @@ perform_os_bootstrap() {
 
 detect_installed_packages() {
   local os=$1
-  local mgr
+  local mgr=${2:-}
   case "$os" in
     macos)
       ensure_homebrew_in_path
       [[ -z $(command -v brew) ]] && return
       for pkg in "${macos_brew_formulae[@]}"; do
         if brew list --formula "$pkg" >/dev/null 2>&1; then
-          printf 'installed %s (formula)\n' "$pkg"
+          printf '%s (formula)\n' "$pkg"
         fi
       done
       for pkg in "${macos_brew_casks[@]}"; do
         if brew list --cask "$pkg" >/dev/null 2>&1; then
-          printf 'installed %s (cask)\n' "$pkg"
+          printf '%s (cask)\n' "$pkg"
         fi
       done
       ;;
     linux)
-      mgr=$(detect_linux_package_manager)
       case "$mgr" in
         apt)
           for pkg in "${linux_apt_packages[@]}"; do
             if dpkg -s "$pkg" >/dev/null 2>&1; then
-              printf 'installed %s\n' "$pkg"
+              printf '%s\n' "$pkg"
             fi
           done
           ;;
         dnf)
           for pkg in "${linux_dnf_packages[@]}"; do
             if rpm -q "$pkg" >/dev/null 2>&1; then
-              printf 'installed %s\n' "$pkg"
+              printf '%s\n' "$pkg"
             fi
           done
           ;;
         pacman)
           for pkg in "${linux_pacman_packages[@]}"; do
             if pacman -Qi "$pkg" >/dev/null 2>&1; then
-              printf 'installed %s\n' "$pkg"
+              printf '%s\n' "$pkg"
             fi
           done
           ;;
@@ -288,23 +287,38 @@ handle_package_bootstrap() {
     return
   fi
 
-  printf '\nDetected operating system: %s\n' "${os^}" >&"$PROMPT_FD"
-  printf 'Detected packages in configuration:\n' >&"$PROMPT_FD"
+  local mgr=""
+  if [[ $os == linux ]]; then
+    mgr=$(detect_linux_package_manager)
+  fi
+
+  printf '\nPackage configuration for %s:\n' "${os^}" >&"$PROMPT_FD"
   case "$os" in
     macos)
       printf '  brew formulae: %s\n' "${macos_brew_formulae[*]:-<none>}" >&"$PROMPT_FD"
       printf '  brew casks: %s\n' "${macos_brew_casks[*]:-<none>}" >&"$PROMPT_FD"
       ;;
     linux)
-      printf '  apt packages: %s\n' "${linux_apt_packages[*]:-<none>}" >&"$PROMPT_FD"
-      printf '  dnf packages: %s\n' "${linux_dnf_packages[*]:-<none>}" >&"$PROMPT_FD"
-      printf '  pacman packages: %s\n' "${linux_pacman_packages[*]:-<none>}" >&"$PROMPT_FD"
+      case "$mgr" in
+        apt)
+          printf '  apt packages: %s\n' "${linux_apt_packages[*]:-<none>}" >&"$PROMPT_FD"
+          ;;
+        dnf)
+          printf '  dnf packages: %s\n' "${linux_dnf_packages[*]:-<none>}" >&"$PROMPT_FD"
+          ;;
+        pacman)
+          printf '  pacman packages: %s\n' "${linux_pacman_packages[*]:-<none>}" >&"$PROMPT_FD"
+          ;;
+        *)
+          printf '  <package manager not detected>\n' >&"$PROMPT_FD"
+          ;;
+      esac
       ;;
   esac
 
   printf '\nAlready installed (best-effort detection):\n' >&"$PROMPT_FD"
   local detected
-  detected=$(detect_installed_packages "$os") || detected=""
+  detected=$(detect_installed_packages "$os" "$mgr") || detected=""
   if [[ -n $detected ]]; then
     printf '  %s\n' "${detected//$'\n'/\n  }" >&"$PROMPT_FD"
   else
@@ -319,7 +333,7 @@ handle_package_bootstrap() {
 
   local os_label=${os^}
   if prompt_yes_no "Install/Update ${os_label} packages?" "$default_answer"; then
-    perform_os_bootstrap "$os"
+    perform_os_bootstrap "$os" "$mgr"
     mark_packages_installed
   else
     info "Skipped package installation."
@@ -630,6 +644,7 @@ main() {
 
   local os_type
   os_type=$(detect_os)
+  info "Operating system detected: ${os_type^}"
   handle_package_bootstrap "$os_type"
 
   info "Installing myprompts assets to ${INSTALL_ROOT/#$HOME/~}"

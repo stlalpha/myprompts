@@ -8,7 +8,8 @@
 - `vaporwave_ls_setup.sh`: legacy helper that only wires LS colors; retained for users who prefer manual sourcing.
 - `config/packages.sh`: Bash-sourced config describing Homebrew/apt/paru/etc. packages per platform.
 - `config/aliases.sh`: alias definitions grouped by shell.
-- `install.sh`: curl-friendly bootstrapper; detects existing installs, prompts before purging, installs OS-specific packages from `config`, and wires assets under `~/.local/share/myprompts`.
+- `install.sh`: curl-friendly bootstrapper; detects existing installs, prompts before purging, generates OS-specific summaries from `config`, bootstraps Ansible, and wires assets under `~/.local/share/myprompts`.
+- `ansible/playbook.yml`: executed locally to install the pending package list (Homebrew/apt/dnf/pacman/paru) after the Bash bootstrap confirms.
 
 ## Build, Test, and Development Commands
 - There is no compilation step; source prompt files directly during development:
@@ -41,7 +42,7 @@
 - Exercise animated prompts in terminals that support 256 colors and Unicode; fall back gracefully in minimal TTYs.
 - For Zsh, ensure `setopt prompt_subst` is active and the prompt renders without layout drift on `%n`, `%m`, and `%~` substitutions.
 - After running `install.sh` (or sourcing `vaporwave_lscolors` directly), open a new session and check `ls -la --color=auto` for expected palette; the installer injects an `alias ls='ls --color=auto'` block when no alias exists.
-- Validate package bootstrap by overriding `PACKAGES_CONFIG_URL` to a fixture and running with `MYPROMPTS_NONINTERACTIVE=1` so CI can simulate the flow without performing installs.
+- Validate package bootstrap by overriding `PACKAGES_CONFIG_URL` to a fixture and running with `MYPROMPTS_NONINTERACTIVE=1` so CI can simulate the flow without performing installs; the generated `ansible_vars.yml` drives `ansible/playbook.yml`.
 
 ## Commit & Pull Request Guidelines
 - Follow Conventional Commits (e.g., `feat: add liquid prompt throttle`) so tooling can parse change intent.

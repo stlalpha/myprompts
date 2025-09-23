@@ -288,7 +288,8 @@ handle_package_bootstrap() {
     return
   fi
 
-  printf '\nDetected packages in configuration:\n' >&"$PROMPT_FD"
+  printf '\nDetected operating system: %s\n' "${os^}" >&"$PROMPT_FD"
+  printf 'Detected packages in configuration:\n' >&"$PROMPT_FD"
   case "$os" in
     macos)
       printf '  brew formulae: %s\n' "${macos_brew_formulae[*]:-<none>}" >&"$PROMPT_FD"
@@ -302,8 +303,12 @@ handle_package_bootstrap() {
   esac
 
   printf '\nAlready installed (best-effort detection):\n' >&"$PROMPT_FD"
-  if ! detect_installed_packages "$os" >&"$PROMPT_FD"; then
-    printf '  <detection not supported>\n' >&"$PROMPT_FD"
+  local detected
+  detected=$(detect_installed_packages "$os") || detected=""
+  if [[ -n $detected ]]; then
+    printf '  %s\n' "${detected//$'\n'/\n  }" >&"$PROMPT_FD"
+  else
+    printf '  <none detected>\n' >&"$PROMPT_FD"
   fi
 
   local default_answer=N

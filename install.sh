@@ -102,6 +102,7 @@ load_configuration() {
   ensure_array linux_apt_packages
   ensure_array linux_dnf_packages
   ensure_array linux_pacman_packages
+  ensure_array linux_paru_packages
   ensure_array zsh_aliases
   ensure_array bash_aliases
 }
@@ -171,8 +172,65 @@ detect_linux_package_manager() {
   fi
 }
 
+filter_missing_packages() {
+  local mgr=$1; shift
+  local packages=("$@")
+  local result=()
+
+  case "$mgr" in
+    apt)
+      for pkg in "${packages[@]}"; do
+        if dpkg -s "$pkg" >/dev/null 2>&1; then
+          info "apt package '$pkg' already installed; skipping."
+        else
+          result+=("$pkg")
+        fi
+      done
+      ;;
+    dnf)
+      for pkg in "${packages[@]}"; do
+        if rpm -q "$pkg" >/dev/null 2>&1; then
+          info "dnf package '$pkg' already installed; skipping."
+        else
+          result+=("$pkg")
+        fi
+      done
+      ;;
+    pacman)
+      for pkg in "${packages[@]}"; do
+        if pacman -Qi "$pkg" >/dev/null 2>&1; then
+          info "pacman package '$pkg' already installed; skipping."
+        else
+          result+=("$pkg")
+        fi
+      done
+      ;;
+    paru)
+      if ! command -v paru >/dev/null 2>&1; then
+        warn "paru not found; cannot install AUR packages (${packages[*]})."
+        echo ""
+        return
+      fi
+      for pkg in "${packages[@]}"; do
+        if paru -Qi "$pkg" >/dev/null 2>&1; then
+          info "paru package '$pkg' already installed; skipping."
+        else
+          result+=("$pkg")
+        fi
+      done
+      ;;
+  esac
+
+  for pkg in "${result[@]}"; do
+    printf '%s\n' "$pkg"
+  done
+}
+
 install_apt_packages() {
   local packages=("$@")
+  [[ ${#packages[@]} -eq 0 ]] && return
+  mapfile -t packages < <(filter_missing_packages apt "${packages[@]}")
+  packages=(${packages[@]:-})
   [[ ${#packages[@]} -eq 0 ]] && return
   info "Installing apt packages: ${packages[*]}"
   sudo apt-get update -y
@@ -182,6 +240,9 @@ install_apt_packages() {
 install_dnf_packages() {
   local packages=("$@")
   [[ ${#packages[@]} -eq 0 ]] && return
+  mapfile -t packages < <(filter_missing_packages dnf "${packages[@]}")
+  packages=(${packages[@]:-})
+  [[ ${#packages[@]} -eq 0 ]] && return
   info "Installing dnf packages: ${packages[*]}"
   sudo dnf install -y "${packages[@]}"
 }
@@ -189,8 +250,25 @@ install_dnf_packages() {
 install_pacman_packages() {
   local packages=("$@")
   [[ ${#packages[@]} -eq 0 ]] && return
+  mapfile -t packages < <(filter_missing_packages pacman "${packages[@]}")
+  packages=(${packages[@]:-})
+  [[ ${#packages[@]} -eq 0 ]] && return
   info "Installing pacman packages: ${packages[*]}"
   sudo pacman -Sy --noconfirm "${packages[@]}"
+}
+
+install_paru_packages() {
+  local packages=("$@")
+  [[ ${#packages[@]} -eq 0 ]] && return
+  if ! command -v paru >/dev/null 2>&1; then
+    warn "paru not found; skipping AUR packages (${packages[*]})."
+    return
+  fi
+  mapfile -t packages < <(filter_missing_packages paru "${packages[@]}")
+  packages=(${packages[@]:-})
+  [[ ${#packages[@]} -eq 0 ]] && return
+  info "Installing paru packages: ${packages[*]}"
+  paru -S --noconfirm "${packages[@]}"
 }
 
 perform_os_bootstrap() {
@@ -257,6 +335,19 @@ detect_installed_packages() {
               printf '%s\n' "$pkg"
             fi
           done
+          if command -v paru >/dev/null 2>&1; then
+            for pkg in "${linux_paru_packages[@]}"; do
+              if paru -Qi "$pkg" >/dev/null 2>&1; then
+                printf '%s (paru)\n' "$pkg"
+              fi
+            done
+          else
+            for pkg in "${linux_paru_packages[@]}"; do
+              if pacman -Qi "$pkg" >/dev/null 2>&1; then
+                printf '%s\n' "$pkg"
+              fi
+            done
+          fi
           ;;
         *)
           ;;
@@ -308,6 +399,7 @@ handle_package_bootstrap() {
           ;;
         pacman)
           printf '  pacman packages: %s\n' "${linux_pacman_packages[*]:-<none>}" >&"$PROMPT_FD"
+          printf '  paru packages: %s\n' "${linux_paru_packages[*]:-<none>}" >&"$PROMPT_FD"
           ;;
         *)
           printf '  <package manager not detected>\n' >&"$PROMPT_FD"

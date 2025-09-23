@@ -26,5 +26,8 @@ linux_dnf_packages=(
 
 linux_pacman_packages=(
   nmap
+)
+
+linux_paru_packages=(
   gnu-netcat
 )

@@ -6,7 +6,7 @@
 - `vaporwave_zsh_prompt`: Zsh-native prompt that mirrors the classic Bash layout, including git branch detection.
 - `vaporwave_lscolors`: exported `LS_COLORS` table that maps common extensions to the vaporwave colorway.
 - `vaporwave_ls_setup.sh`: legacy helper that only wires LS colors; retained for users who prefer manual sourcing.
-- `config/packages.sh`: Bash-sourced config describing Homebrew/apt/etc. packages per platform.
+- `config/packages.sh`: Bash-sourced config describing Homebrew/apt/paru/etc. packages per platform.
 - `config/aliases.sh`: alias definitions grouped by shell.
 - `install.sh`: curl-friendly bootstrapper; detects existing installs, prompts before purging, installs OS-specific packages from `config`, and wires assets under `~/.local/share/myprompts`.
 
@@ -50,5 +50,5 @@
 
 ## Setup Tips for New Agents
 - Keep local copies of prompts under version control; do not edit the installed dotfiles directly.
-- Extend `config/packages.sh`/`config/aliases.sh` to add software or aliases; keep entries grouped per OS/package manager.
+- Extend `config/packages.sh`/`config/aliases.sh` to add software or aliases; keep entries grouped per OS/package manager (e.g., `linux_paru_packages` for AUR installs).
 - Document any terminal-specific tweaks (e.g., iTerm color profiles) in the PR to inform reviewers and downstream users.

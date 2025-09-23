@@ -30,6 +30,14 @@ VW_INSTALLED_ICON='✧'
 VW_TOP_BORDER='.0Oo............................................................oO0>'
 VW_BOTTOM_BORDER='<0Oo............................................................oO0.'
 
+pending_macos_brew_formulae=()
+pending_macos_brew_casks=()
+pending_linux_apt_packages=()
+pending_linux_dnf_packages=()
+pending_linux_pacman_packages=()
+pending_linux_paru_packages=()
+pending_linux_paru_blocked=()
+
 INTERACTIVE=0
 PROMPT_FD=0
 TTY_FD_OPENED=0
@@ -92,6 +100,21 @@ print_pkg_group() {
     printf '    %b%s%b %b%s:%b %b<none>%b\n' \
       "$VW_PINK" "$VW_ITEM_ICON" "$VW_RESET" "$color" "$label" "$VW_RESET" "$VW_GRAY" "$VW_RESET"
   fi
+}
+
+print_pkg_list() {
+  local label=$1
+  local color=$2
+  shift 2
+  local packages=("$@")
+  if [[ ${#packages[@]} -gt 0 ]]; then
+    printf '    %b%s%b %b%s:%b %b%s%b\n' \
+      "$VW_PINK" "$VW_ITEM_ICON" "$VW_RESET" "$color" "$label" "$VW_RESET" "$color" "${packages[*]}" "$VW_RESET"
+  fi
+}
+
+print_none_line() {
+  printf '    %b%s%b %b<none>%b\n' "$VW_PINK" "$VW_ITEM_ICON" "$VW_RESET" "$VW_GRAY" "$VW_RESET"
 }
 
 print_installed_items() {
@@ -253,6 +276,34 @@ filter_missing_packages() {
         fi
       done
       ;;
+    brew_formulae)
+      if ! command -v brew >/dev/null 2>&1; then
+        printf '%s\n' "${packages[@]}"
+        return
+      fi
+      ensure_homebrew_in_path
+      for pkg in "${packages[@]}"; do
+        if brew list --formula "$pkg" >/dev/null 2>&1; then
+          info "brew formula '$pkg' already installed; skipping."
+        else
+          result+=("$pkg")
+        fi
+      done
+      ;;
+    brew_casks)
+      if ! command -v brew >/dev/null 2>&1; then
+        printf '%s\n' "${packages[@]}"
+        return
+      fi
+      ensure_homebrew_in_path
+      for pkg in "${packages[@]}"; do
+        if brew list --cask "$pkg" >/dev/null 2>&1; then
+          info "brew cask '$pkg' already installed; skipping."
+        else
+          result+=("$pkg")
+        fi
+      done
+      ;;
   esac
 
   for pkg in "${result[@]}"; do
@@ -263,9 +314,6 @@ filter_missing_packages() {
 install_apt_packages() {
   local packages=("$@")
   [[ ${#packages[@]} -eq 0 ]] && return
-  mapfile -t packages < <(filter_missing_packages apt "${packages[@]}")
-  packages=(${packages[@]:-})
-  [[ ${#packages[@]} -eq 0 ]] && return
   info "Installing apt packages: ${packages[*]}"
   sudo apt-get update -y
   sudo apt-get install -y "${packages[@]}"
@@ -274,18 +322,12 @@ install_apt_packages() {
 install_dnf_packages() {
   local packages=("$@")
   [[ ${#packages[@]} -eq 0 ]] && return
-  mapfile -t packages < <(filter_missing_packages dnf "${packages[@]}")
-  packages=(${packages[@]:-})
-  [[ ${#packages[@]} -eq 0 ]] && return
   info "Installing dnf packages: ${packages[*]}"
   sudo dnf install -y "${packages[@]}"
 }
 
 install_pacman_packages() {
   local packages=("$@")
-  [[ ${#packages[@]} -eq 0 ]] && return
-  mapfile -t packages < <(filter_missing_packages pacman "${packages[@]}")
-  packages=(${packages[@]:-})
   [[ ${#packages[@]} -eq 0 ]] && return
   info "Installing pacman packages: ${packages[*]}"
   sudo pacman -Sy --noconfirm "${packages[@]}"
@@ -294,12 +336,6 @@ install_pacman_packages() {
 install_paru_packages() {
   local packages=("$@")
   [[ ${#packages[@]} -eq 0 ]] && return
-  if ! command -v paru >/dev/null 2>&1; then
-    warn "paru not found; skipping AUR packages (${packages[*]})."
-    return
-  fi
-  mapfile -t packages < <(filter_missing_packages paru "${packages[@]}")
-  packages=(${packages[@]:-})
   [[ ${#packages[@]} -eq 0 ]] && return
   info "Installing paru packages: ${packages[*]}"
   paru -S --noconfirm "${packages[@]}"
@@ -311,15 +347,41 @@ perform_os_bootstrap() {
   case "$os" in
     macos)
       ensure_homebrew
-      install_brew_formulae "${macos_brew_formulae[@]}"
-      install_brew_casks "${macos_brew_casks[@]}"
+      local formulae=()
+      local casks=()
+      formulae=("${pending_macos_brew_formulae[@]}")
+      casks=("${pending_macos_brew_casks[@]}")
+      [[ ${#formulae[@]} -eq 0 ]] && formulae=("${macos_brew_formulae[@]}")
+      [[ ${#casks[@]} -eq 0 ]] && casks=("${macos_brew_casks[@]}")
+      install_brew_formulae "${formulae[@]}"
+      install_brew_casks "${casks[@]}"
       ;;
     linux)
       [[ -z $mgr ]] && mgr=$(detect_linux_package_manager)
       case "$mgr" in
-        apt) install_apt_packages "${linux_apt_packages[@]}" ;;
-        dnf) install_dnf_packages "${linux_dnf_packages[@]}" ;;
-        pacman) install_pacman_packages "${linux_pacman_packages[@]}" ;;
+        apt)
+          local apt_pkgs=("${pending_linux_apt_packages[@]}")
+          [[ ${#apt_pkgs[@]} -eq 0 ]] && apt_pkgs=("${linux_apt_packages[@]}")
+          install_apt_packages "${apt_pkgs[@]}"
+          ;;
+        dnf)
+          local dnf_pkgs=("${pending_linux_dnf_packages[@]}")
+          [[ ${#dnf_pkgs[@]} -eq 0 ]] && dnf_pkgs=("${linux_dnf_packages[@]}")
+          install_dnf_packages "${dnf_pkgs[@]}"
+          ;;
+        pacman)
+          local pacman_pkgs=("${pending_linux_pacman_packages[@]}")
+          [[ ${#pacman_pkgs[@]} -eq 0 ]] && pacman_pkgs=("${linux_pacman_packages[@]}")
+          install_pacman_packages "${pacman_pkgs[@]}"
+          local paru_pkgs=("${pending_linux_paru_packages[@]}")
+          if [[ ${#paru_pkgs[@]} -gt 0 ]]; then
+            if command -v paru >/dev/null 2>&1; then
+              install_paru_packages "${paru_pkgs[@]}"
+            else
+              warn "paru not installed; skipped AUR packages: ${paru_pkgs[*]}"
+            fi
+          fi
+          ;;
         *) warn "Unsupported Linux package manager; skipping package installation." ;;
       esac
       ;;
@@ -412,6 +474,14 @@ handle_package_bootstrap() {
     return
   fi
 
+  pending_macos_brew_formulae=()
+  pending_macos_brew_casks=()
+  pending_linux_apt_packages=()
+  pending_linux_dnf_packages=()
+  pending_linux_pacman_packages=()
+  pending_linux_paru_packages=()
+  pending_linux_paru_blocked=()
+
   local mgr=""
   local mgr_label=""
   if [[ $os == linux ]]; then
@@ -430,6 +500,54 @@ handle_package_bootstrap() {
     esac
   else
     mgr_label="Homebrew"
+  fi
+
+  case "$os" in
+    macos)
+      if command -v brew >/dev/null 2>&1; then
+        ensure_homebrew_in_path
+        mapfile -t pending_macos_brew_formulae < <(filter_missing_packages brew_formulae "${macos_brew_formulae[@]}")
+        mapfile -t pending_macos_brew_casks < <(filter_missing_packages brew_casks "${macos_brew_casks[@]}")
+      else
+        pending_macos_brew_formulae=("${macos_brew_formulae[@]}")
+        pending_macos_brew_casks=("${macos_brew_casks[@]}")
+        warn "Homebrew not detected; formulae and casks will require manual setup."
+      fi
+      ;;
+    linux)
+      case "$mgr" in
+        apt)
+          mapfile -t pending_linux_apt_packages < <(filter_missing_packages apt "${linux_apt_packages[@]}")
+          ;;
+        dnf)
+          mapfile -t pending_linux_dnf_packages < <(filter_missing_packages dnf "${linux_dnf_packages[@]}")
+          ;;
+        pacman)
+          mapfile -t pending_linux_pacman_packages < <(filter_missing_packages pacman "${linux_pacman_packages[@]}")
+          if command -v paru >/dev/null 2>&1; then
+            mapfile -t pending_linux_paru_packages < <(filter_missing_packages paru "${linux_paru_packages[@]}")
+          else
+            pending_linux_paru_blocked=("${linux_paru_packages[@]}")
+          fi
+          ;;
+        *)
+          ;;
+      esac
+      ;;
+  esac
+
+  local pending_total=$(( ${#pending_macos_brew_formulae[@]} + ${#pending_macos_brew_casks[@]} + ${#pending_linux_apt_packages[@]} + ${#pending_linux_dnf_packages[@]} + ${#pending_linux_pacman_packages[@]} + ${#pending_linux_paru_packages[@]} ))
+
+  local summary_parts=()
+  [[ ${#pending_macos_brew_formulae[@]} -gt 0 ]] && summary_parts+=("brew:${pending_macos_brew_formulae[*]}")
+  [[ ${#pending_macos_brew_casks[@]} -gt 0 ]] && summary_parts+=("casks:${pending_macos_brew_casks[*]}")
+  [[ ${#pending_linux_apt_packages[@]} -gt 0 ]] && summary_parts+=("apt:${pending_linux_apt_packages[*]}")
+  [[ ${#pending_linux_dnf_packages[@]} -gt 0 ]] && summary_parts+=("dnf:${pending_linux_dnf_packages[*]}")
+  [[ ${#pending_linux_pacman_packages[@]} -gt 0 ]] && summary_parts+=("pacman:${pending_linux_pacman_packages[*]}")
+  [[ ${#pending_linux_paru_packages[@]} -gt 0 ]] && summary_parts+=("paru:${pending_linux_paru_packages[*]}")
+  local pending_summary="<none>"
+  if [[ ${#summary_parts[@]} -gt 0 ]]; then
+    pending_summary=$(IFS=', '; echo "${summary_parts[*]}")
   fi
 
   printf '\n%b%s%b %bPackage Setup%b for %s (%s)%b\n' \
@@ -465,6 +583,68 @@ handle_package_bootstrap() {
   detected=$(detect_installed_packages "$os" "$mgr") || detected=""
   print_installed_items "$detected" >&"$PROMPT_FD"
 
+  printf '\n%b%s%b %bPending installs%b\n' "$VW_PINK" "$VW_SECTION_ICON" "$VW_RESET" "$VW_CYAN" "$VW_RESET" >&"$PROMPT_FD"
+  local pending_shown=0
+  if [[ $os == macos ]]; then
+    if [[ ${#pending_macos_brew_formulae[@]} -gt 0 ]]; then
+      print_pkg_list 'brew formulae' "$VW_ORANGE" "${pending_macos_brew_formulae[@]}" >&"$PROMPT_FD"
+      pending_shown=1
+    fi
+    if [[ ${#pending_macos_brew_casks[@]} -gt 0 ]]; then
+      print_pkg_list 'brew casks' "$VW_PURPLE" "${pending_macos_brew_casks[@]}" >&"$PROMPT_FD"
+      pending_shown=1
+    fi
+  else
+    case "$mgr" in
+      apt)
+        if [[ ${#pending_linux_apt_packages[@]} -gt 0 ]]; then
+          print_pkg_list 'apt packages' "$VW_ORANGE" "${pending_linux_apt_packages[@]}" >&"$PROMPT_FD"
+          pending_shown=1
+        fi
+        ;;
+      dnf)
+        if [[ ${#pending_linux_dnf_packages[@]} -gt 0 ]]; then
+          print_pkg_list 'dnf packages' "$VW_ORANGE" "${pending_linux_dnf_packages[@]}" >&"$PROMPT_FD"
+          pending_shown=1
+        fi
+        ;;
+      pacman)
+        if [[ ${#pending_linux_pacman_packages[@]} -gt 0 ]]; then
+          print_pkg_list 'pacman packages' "$VW_ORANGE" "${pending_linux_pacman_packages[@]}" >&"$PROMPT_FD"
+          pending_shown=1
+        fi
+        if [[ ${#pending_linux_paru_packages[@]} -gt 0 ]]; then
+          print_pkg_list 'paru packages' "$VW_MAGENTA" "${pending_linux_paru_packages[@]}" >&"$PROMPT_FD"
+          pending_shown=1
+        fi
+        ;;
+    esac
+  fi
+
+  if (( ${#pending_linux_paru_blocked[@]} > 0 )); then
+    local display_paru=()
+    for pkg in "${pending_linux_paru_blocked[@]}"; do
+      [[ -z $pkg ]] && continue
+      display_paru+=("${pkg} (requires paru)")
+    done
+    print_pkg_list 'paru packages' "$VW_GRAY" "${display_paru[@]}" >&"$PROMPT_FD"
+    pending_shown=1
+  fi
+
+  if (( pending_shown == 0 )); then
+    print_none_line >&"$PROMPT_FD"
+  fi
+
+  if (( pending_total == 0 )) && (( ${#pending_linux_paru_blocked[@]} == 0 )); then
+    info "All configured packages already installed; skipping package installation."
+    return
+  fi
+
+  if (( pending_total == 0 )) && (( ${#pending_linux_paru_blocked[@]} > 0 )); then
+    warn "Install paru to manage: ${pending_linux_paru_blocked[*]}"
+    return
+  fi
+
   local default_answer=N
   if packages_already_configured; then
     default_answer=Y
@@ -472,7 +652,8 @@ handle_package_bootstrap() {
   fi
 
   local os_label=${os^}
-  if prompt_yes_no "Install/Update ${os_label} packages?" "$default_answer"; then
+  local prompt_text="Install/Update ${os_label} packages? (pending: ${pending_summary})"
+  if prompt_yes_no "$prompt_text" "$default_answer"; then
     perform_os_bootstrap "$os" "$mgr"
     mark_packages_installed
   else

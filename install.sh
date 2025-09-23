@@ -217,6 +217,110 @@ perform_os_bootstrap() {
   esac
 }
 
+detect_installed_packages() {
+  local os=$1
+  local mgr
+  case "$os" in
+    macos)
+      ensure_homebrew_in_path
+      [[ -z $(command -v brew) ]] && return
+      for pkg in "${macos_brew_formulae[@]}"; do
+        if brew list --formula "$pkg" >/dev/null 2>&1; then
+          printf 'installed %s (formula)\n' "$pkg"
+        fi
+      done
+      for pkg in "${macos_brew_casks[@]}"; do
+        if brew list --cask "$pkg" >/dev/null 2>&1; then
+          printf 'installed %s (cask)\n' "$pkg"
+        fi
+      done
+      ;;
+    linux)
+      mgr=$(detect_linux_package_manager)
+      case "$mgr" in
+        apt)
+          for pkg in "${linux_apt_packages[@]}"; do
+            if dpkg -s "$pkg" >/dev/null 2>&1; then
+              printf 'installed %s\n' "$pkg"
+            fi
+          done
+          ;;
+        dnf)
+          for pkg in "${linux_dnf_packages[@]}"; do
+            if rpm -q "$pkg" >/dev/null 2>&1; then
+              printf 'installed %s\n' "$pkg"
+            fi
+          done
+          ;;
+        pacman)
+          for pkg in "${linux_pacman_packages[@]}"; do
+            if pacman -Qi "$pkg" >/dev/null 2>&1; then
+              printf 'installed %s\n' "$pkg"
+            fi
+          done
+          ;;
+        *)
+          ;;
+      esac
+      ;;
+  esac
+}
+
+packages_already_configured() {
+  local flag_file="$INSTALL_ROOT/.packages-installed"
+  [[ -f $flag_file ]]
+}
+
+mark_packages_installed() {
+  local flag_file="$INSTALL_ROOT/.packages-installed"
+  printf 'installed %s\n' "$(date -u +%FT%TZ)" >"$flag_file"
+}
+
+handle_package_bootstrap() {
+  local os=$1
+  if [[ $os == unknown ]]; then
+    warn "Could not determine operating system automatically; package installation skipped."
+    return
+  fi
+
+  if (( ! INTERACTIVE )); then
+    info "Non-interactive mode; skipping package installation."
+    return
+  fi
+
+  printf '\nDetected packages in configuration:\n' >&"$PROMPT_FD"
+  case "$os" in
+    macos)
+      printf '  brew formulae: %s\n' "${macos_brew_formulae[*]:-<none>}" >&"$PROMPT_FD"
+      printf '  brew casks: %s\n' "${macos_brew_casks[*]:-<none>}" >&"$PROMPT_FD"
+      ;;
+    linux)
+      printf '  apt packages: %s\n' "${linux_apt_packages[*]:-<none>}" >&"$PROMPT_FD"
+      printf '  dnf packages: %s\n' "${linux_dnf_packages[*]:-<none>}" >&"$PROMPT_FD"
+      printf '  pacman packages: %s\n' "${linux_pacman_packages[*]:-<none>}" >&"$PROMPT_FD"
+      ;;
+  esac
+
+  printf '\nAlready installed (best-effort detection):\n' >&"$PROMPT_FD"
+  if ! detect_installed_packages "$os" >&"$PROMPT_FD"; then
+    printf '  <detection not supported>\n' >&"$PROMPT_FD"
+  fi
+
+  local default_answer=N
+  if packages_already_configured; then
+    default_answer=Y
+    printf '\nPrevious bootstrap detected at %s/.packages-installed\n' "${INSTALL_ROOT/#$HOME/~}" >&"$PROMPT_FD"
+  fi
+
+  local os_label=${os^}
+  if prompt_yes_no "Install/Update ${os_label} packages?" "$default_answer"; then
+    perform_os_bootstrap "$os"
+    mark_packages_installed
+  else
+    info "Skipped package installation."
+  fi
+}
+
 apply_aliases_for_shell() {
   local rc_file=$1
   local alias_array_name=$2
@@ -521,20 +625,7 @@ main() {
 
   local os_type
   os_type=$(detect_os)
-  if [[ $os_type != unknown ]]; then
-    if (( INTERACTIVE )); then
-      local os_label=${os_type^}
-      if prompt_yes_no "Install recommended ${os_label} packages?" Y; then
-        perform_os_bootstrap "$os_type"
-      else
-        info "Skipped package installation."
-      fi
-    else
-      perform_os_bootstrap "$os_type"
-    fi
-  else
-    warn "Could not determine operating system automatically; package installation skipped."
-  fi
+  handle_package_bootstrap "$os_type"
 
   info "Installing myprompts assets to ${INSTALL_ROOT/#$HOME/~}"
   mkdir -p "$INSTALL_ROOT"

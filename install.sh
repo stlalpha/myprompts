@@ -238,7 +238,7 @@ filter_missing_packages() {
     apt)
       for pkg in "${packages[@]}"; do
         if dpkg -s "$pkg" >/dev/null 2>&1; then
-          info "apt package '$pkg' already installed; skipping."
+          info "apt package '$pkg' already installed; skipping." >&2
         else
           result+=("$pkg")
         fi
@@ -247,7 +247,7 @@ filter_missing_packages() {
     dnf)
       for pkg in "${packages[@]}"; do
         if rpm -q "$pkg" >/dev/null 2>&1; then
-          info "dnf package '$pkg' already installed; skipping."
+          info "dnf package '$pkg' already installed; skipping." >&2
         else
           result+=("$pkg")
         fi
@@ -256,7 +256,7 @@ filter_missing_packages() {
     pacman)
       for pkg in "${packages[@]}"; do
         if pacman -Qi "$pkg" >/dev/null 2>&1; then
-          info "pacman package '$pkg' already installed; skipping."
+          info "pacman package '$pkg' already installed; skipping." >&2
         else
           result+=("$pkg")
         fi
@@ -264,13 +264,13 @@ filter_missing_packages() {
       ;;
     paru)
       if ! command -v paru >/dev/null 2>&1; then
-        warn "paru not found; cannot install AUR packages (${packages[*]})."
+        warn "paru not found; cannot install AUR packages (${packages[*]})." >&2
         echo ""
         return
       fi
       for pkg in "${packages[@]}"; do
         if paru -Qi "$pkg" >/dev/null 2>&1; then
-          info "paru package '$pkg' already installed; skipping."
+          info "paru package '$pkg' already installed; skipping." >&2
         else
           result+=("$pkg")
         fi
@@ -284,7 +284,7 @@ filter_missing_packages() {
       ensure_homebrew_in_path
       for pkg in "${packages[@]}"; do
         if brew list --formula "$pkg" >/dev/null 2>&1; then
-          info "brew formula '$pkg' already installed; skipping."
+          info "brew formula '$pkg' already installed; skipping." >&2
         else
           result+=("$pkg")
         fi
@@ -298,7 +298,7 @@ filter_missing_packages() {
       ensure_homebrew_in_path
       for pkg in "${packages[@]}"; do
         if brew list --cask "$pkg" >/dev/null 2>&1; then
-          info "brew cask '$pkg' already installed; skipping."
+          info "brew cask '$pkg' already installed; skipping." >&2
         else
           result+=("$pkg")
         fi

@@ -1,0 +1,104 @@
+---
+- hosts: localhost
+  gather_facts: false
+  vars:
+    brew_formulae: []
+    brew_casks: []
+    apt_packages: []
+    dnf_packages: []
+    pacman_packages: []
+    paru_packages: []
+    target_os: "{{ target_os | default('unknown') }}"
+    package_manager: "{{ package_manager | default('unknown') }}"
+
+  tasks:
+    - name: Install Homebrew formulae
+      ansible.builtin.command: brew install {{ item }}
+      args:
+        warn: false
+      register: brew_install
+      changed_when: "'already installed' not in brew_install.stdout"
+      loop: "{{ brew_formulae }}"
+      when:
+        - target_os == 'macos'
+        - brew_formulae | length > 0
+
+    - name: Install Homebrew casks
+      ansible.builtin.command: brew install --cask {{ item }}
+      args:
+        warn: false
+      register: brew_cask
+      changed_when: "'already installed' not in brew_cask.stdout"
+      loop: "{{ brew_casks }}"
+      when:
+        - target_os == 'macos'
+        - brew_casks | length > 0
+
+    - name: Update apt cache
+      become: true
+      ansible.builtin.command: apt-get update -y
+      args:
+        warn: false
+      changed_when: false
+      when:
+        - target_os == 'linux'
+        - package_manager == 'apt'
+        - apt_packages | length > 0
+
+    - name: Install apt packages
+      become: true
+      ansible.builtin.command: apt-get install -y {{ item }}
+      args:
+        warn: false
+      register: apt_install
+      changed_when: apt_install.rc == 0
+      loop: "{{ apt_packages }}"
+      when:
+        - target_os == 'linux'
+        - package_manager == 'apt'
+        - apt_packages | length > 0
+      notify: Update apt cache
+
+    - name: Install dnf packages
+      become: true
+      ansible.builtin.command: dnf install -y {{ item }}
+      args:
+        warn: false
+      register: dnf_install
+      changed_when: dnf_install.rc == 0
+      loop: "{{ dnf_packages }}"
+      when:
+        - target_os == 'linux'
+        - package_manager == 'dnf'
+        - dnf_packages | length > 0
+
+    - name: Install pacman packages
+      become: true
+      ansible.builtin.command: pacman -S --noconfirm --needed {{ item }}
+      args:
+        warn: false
+      register: pacman_install
+      changed_when: "'There is nothing to do' not in pacman_install.stdout"
+      loop: "{{ pacman_packages }}"
+      when:
+        - target_os == 'linux'
+        - package_manager == 'pacman'
+        - pacman_packages | length > 0
+
+    - name: Install paru packages
+      ansible.builtin.command: paru -S --noconfirm --needed {{ item }}
+      args:
+        warn: false
+      register: paru_install
+      changed_when: "'There is nothing to do' not in paru_install.stdout"
+      loop: "{{ paru_packages }}"
+      when:
+        - target_os == 'linux'
+        - package_manager == 'pacman'
+        - paru_packages | length > 0
+
+  handlers:
+    - name: Update apt cache
+      become: true
+      ansible.builtin.command: apt-get update -y
+      listen: Update apt cache

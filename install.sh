@@ -341,54 +341,163 @@ install_paru_packages() {
   paru -S --noconfirm "${packages[@]}"
 }
 
-perform_os_bootstrap() {
+generate_ansible_vars() {
+  local file=$1
+  local os=$2
+  local mgr=${3:-}
+
+  {
+    printf "target_os: \"%s\"\n" "$os"
+    printf "package_manager: \"%s\"\n" "$mgr"
+
+    printf "brew_formulae:\n"
+    if [[ ${#pending_macos_brew_formulae[@]} -gt 0 ]]; then
+      for pkg in "${pending_macos_brew_formulae[@]}"; do
+        [[ -z $pkg ]] && continue
+        printf "  - %s\n" "$pkg"
+      done
+    else
+      printf "  []\n"
+    fi
+
+    printf "brew_casks:\n"
+    if [[ ${#pending_macos_brew_casks[@]} -gt 0 ]]; then
+      for pkg in "${pending_macos_brew_casks[@]}"; do
+        [[ -z $pkg ]] && continue
+        printf "  - %s\n" "$pkg"
+      done
+    else
+      printf "  []\n"
+    fi
+
+    printf "apt_packages:\n"
+    if [[ ${#pending_linux_apt_packages[@]} -gt 0 ]]; then
+      for pkg in "${pending_linux_apt_packages[@]}"; do
+        [[ -z $pkg ]] && continue
+        printf "  - %s\n" "$pkg"
+      done
+    else
+      printf "  []\n"
+    fi
+
+    printf "dnf_packages:\n"
+    if [[ ${#pending_linux_dnf_packages[@]} -gt 0 ]]; then
+      for pkg in "${pending_linux_dnf_packages[@]}"; do
+        [[ -z $pkg ]] && continue
+        printf "  - %s\n" "$pkg"
+      done
+    else
+      printf "  []\n"
+    fi
+
+    printf "pacman_packages:\n"
+    if [[ ${#pending_linux_pacman_packages[@]} -gt 0 ]]; then
+      for pkg in "${pending_linux_pacman_packages[@]}"; do
+        [[ -z $pkg ]] && continue
+        printf "  - %s\n" "$pkg"
+      done
+    else
+      printf "  []\n"
+    fi
+
+    printf "paru_packages:\n"
+    if [[ ${#pending_linux_paru_packages[@]} -gt 0 ]]; then
+      for pkg in "${pending_linux_paru_packages[@]}"; do
+        [[ -z $pkg ]] && continue
+        printf "  - %s\n" "$pkg"
+      done
+    else
+      printf "  []\n"
+    fi
+  } >"$file"
+}
+
+download_ansible_assets() {
+  local dest="$INSTALL_ROOT/ansible"
+  mkdir -p "$dest"
+  if ! curl -fsSL "$BASE_URL/ansible/playbook.yml" -o "$dest/playbook.yml"; then
+    warn "Unable to download Ansible playbook; skipping package bootstrap."
+    return 1
+  fi
+  return 0
+}
+
+ensure_ansible() {
   local os=$1
   local mgr=${2:-}
+  if command -v ansible-playbook >/dev/null 2>&1; then
+    return 0
+  fi
+
   case "$os" in
     macos)
       ensure_homebrew
-      local formulae=()
-      local casks=()
-      formulae=("${pending_macos_brew_formulae[@]}")
-      casks=("${pending_macos_brew_casks[@]}")
-      [[ ${#formulae[@]} -eq 0 ]] && formulae=("${macos_brew_formulae[@]}")
-      [[ ${#casks[@]} -eq 0 ]] && casks=("${macos_brew_casks[@]}")
-      install_brew_formulae "${formulae[@]}"
-      install_brew_casks "${casks[@]}"
+      info "Installing Ansible via Homebrew."
+      if ! brew list --formula ansible >/dev/null 2>&1; then
+        brew install ansible
+      fi
       ;;
     linux)
-      [[ -z $mgr ]] && mgr=$(detect_linux_package_manager)
       case "$mgr" in
         apt)
-          local apt_pkgs=("${pending_linux_apt_packages[@]}")
-          [[ ${#apt_pkgs[@]} -eq 0 ]] && apt_pkgs=("${linux_apt_packages[@]}")
-          install_apt_packages "${apt_pkgs[@]}"
+          info "Installing Ansible via apt."
+          sudo apt-get update -y
+          sudo apt-get install -y ansible
           ;;
         dnf)
-          local dnf_pkgs=("${pending_linux_dnf_packages[@]}")
-          [[ ${#dnf_pkgs[@]} -eq 0 ]] && dnf_pkgs=("${linux_dnf_packages[@]}")
-          install_dnf_packages "${dnf_pkgs[@]}"
+          info "Installing Ansible via dnf."
+          sudo dnf install -y ansible
           ;;
         pacman)
-          local pacman_pkgs=("${pending_linux_pacman_packages[@]}")
-          [[ ${#pacman_pkgs[@]} -eq 0 ]] && pacman_pkgs=("${linux_pacman_packages[@]}")
-          install_pacman_packages "${pacman_pkgs[@]}"
-          local paru_pkgs=("${pending_linux_paru_packages[@]}")
-          if [[ ${#paru_pkgs[@]} -gt 0 ]]; then
-            if command -v paru >/dev/null 2>&1; then
-              install_paru_packages "${paru_pkgs[@]}"
-            else
-              warn "paru not installed; skipped AUR packages: ${paru_pkgs[*]}"
-            fi
-          fi
+          info "Installing Ansible via pacman."
+          sudo pacman -Sy --noconfirm ansible
           ;;
-        *) warn "Unsupported Linux package manager; skipping package installation." ;;
+        *)
+          warn "Unknown package manager; install Ansible manually."
+          return 1
+          ;;
       esac
       ;;
     *)
-      warn "Unable to determine operating system; skipping package installation."
+      warn "Unsupported OS for automatic Ansible installation."
+      return 1
       ;;
   esac
+
+  if ! command -v ansible-playbook >/dev/null 2>&1; then
+    warn "Ansible installation failed; skipping package bootstrap."
+    return 1
+  fi
+  return 0
+}
+
+run_ansible_bootstrap() {
+  local os=$1
+  local mgr=${2:-}
+
+  if ! download_ansible_assets; then
+    return
+  fi
+
+  if ! ensure_ansible "$os" "$mgr"; then
+    return
+  fi
+
+  local vars_file="$CONFIG_TMP_DIR/ansible_vars.yml"
+  generate_ansible_vars "$vars_file" "$os" "$mgr"
+
+  local playbook="$INSTALL_ROOT/ansible/playbook.yml"
+  if [[ ! -f $playbook ]]; then
+    warn "Ansible playbook missing at $playbook; skipping package bootstrap."
+    return
+  fi
+
+  local become_args=(-b)
+  if ! sudo -n true 2>/dev/null; then
+    become_args+=(-K)
+  fi
+
+  ANSIBLE_NOCOWS=1 ANSIBLE_FORCE_COLOR=1 ansible-playbook -i localhost, -c local -e "@$vars_file" "$playbook" "${become_args[@]}"
 }
 
 detect_installed_packages() {
@@ -654,7 +763,7 @@ handle_package_bootstrap() {
   local os_label=${os^}
   local prompt_text="Install/Update ${os_label} packages? (pending: ${pending_summary})"
   if prompt_yes_no "$prompt_text" "$default_answer"; then
-    perform_os_bootstrap "$os" "$mgr"
+    run_ansible_bootstrap "$os" "$mgr"
     mark_packages_installed
   else
     info "Skipped package installation."

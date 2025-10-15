@@ -415,7 +415,8 @@ generate_ansible_vars() {
 download_ansible_assets() {
   local dest="$INSTALL_ROOT/ansible"
   mkdir -p "$dest"
-  if ! curl -fsSL "$BASE_URL/ansible/playbook.yml" -o "$dest/playbook.yml"; then
+  # Always force fresh download of playbook (no caching)
+  if ! curl -fsSL -H 'Cache-Control: no-cache' "$BASE_URL/ansible/playbook.yml" -o "$dest/playbook.yml"; then
     warn "Unable to download Ansible playbook; skipping package bootstrap."
     return 1
   fi

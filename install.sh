@@ -1074,7 +1074,9 @@ main() {
 
   local os_type
   os_type=$(detect_os)
-  info "Operating system detected: ${os_type^}"
+  local os_type_display
+  os_type_display=$(echo "$os_type" | sed 's/./\U&/')
+  info "Operating system detected: $os_type_display"
   handle_package_bootstrap "$os_type"
 
   info "Installing myprompts assets to ${INSTALL_ROOT/#$HOME/~}"

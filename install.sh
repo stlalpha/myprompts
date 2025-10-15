@@ -326,10 +326,27 @@ filter_missing_packages() {
       fi
       ensure_homebrew_in_path
       for pkg in "${packages[@]}"; do
+        # Check if installed via brew cask
         if brew list --cask "$pkg" >/dev/null 2>&1; then
           info "brew cask '$pkg' already installed; skipping." >&2
         else
-          result+=("$pkg")
+          # Check if app exists in /Applications (for apps installed outside brew)
+          local app_exists=false
+          case "$pkg" in
+            iterm2)
+              [[ -d "/Applications/iTerm.app" ]] && app_exists=true
+              ;;
+            bettertouchtool)
+              [[ -d "/Applications/BetterTouchTool.app" ]] && app_exists=true
+              ;;
+            # Add more cask-to-app mappings as needed
+          esac
+
+          if [[ $app_exists == true ]]; then
+            info "App for cask '$pkg' already exists in /Applications; skipping." >&2
+          else
+            result+=("$pkg")
+          fi
         fi
       done
       ;;
@@ -584,6 +601,16 @@ detect_installed_packages() {
       for pkg in "${macos_brew_casks[@]}"; do
         if brew list --cask "$pkg" >/dev/null 2>&1; then
           printf '%s (cask)\n' "$pkg"
+        else
+          # Check if app exists outside of brew
+          case "$pkg" in
+            iterm2)
+              [[ -d "/Applications/iTerm.app" ]] && printf 'iTerm.app (external)\n'
+              ;;
+            bettertouchtool)
+              [[ -d "/Applications/BetterTouchTool.app" ]] && printf 'BetterTouchTool.app (external)\n'
+              ;;
+          esac
         fi
       done
       if command -v mas >/dev/null 2>&1; then

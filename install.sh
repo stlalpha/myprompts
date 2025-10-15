@@ -502,7 +502,8 @@ run_ansible_bootstrap() {
     fi
   fi
 
-  ANSIBLE_NOCOWS=1 ANSIBLE_FORCE_COLOR=1 ansible-playbook -i localhost, -c local -e "@$vars_file" "$playbook" "${ansible_args[@]}"
+  # Use ${ansible_args[@]+"${ansible_args[@]}"} to handle empty array with set -u
+  ANSIBLE_NOCOWS=1 ANSIBLE_FORCE_COLOR=1 ansible-playbook -i localhost, -c local -e "@$vars_file" "$playbook" ${ansible_args[@]+"${ansible_args[@]}"}
 }
 
 detect_installed_packages() {

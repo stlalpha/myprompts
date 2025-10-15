@@ -9,7 +9,7 @@ macos_brew_formulae=(
 
 macos_brew_casks=(
   iterm2
-  magnet
+  # magnet        # No longer available as cask - install from App Store
   bettertouchtool
 )
 

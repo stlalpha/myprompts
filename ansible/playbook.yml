@@ -26,6 +26,10 @@
       ansible.builtin.command: brew install --cask {{ item }}
       register: brew_cask
       changed_when: "'already installed' not in brew_cask.stdout"
+      failed_when:
+        - brew_cask.rc != 0
+        - "'It seems there is already an App at' not in brew_cask.stderr"
+        - "'is unavailable' not in brew_cask.stderr"
       loop: "{{ brew_casks }}"
       become: false
       when:

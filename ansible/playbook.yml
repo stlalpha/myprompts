@@ -37,27 +37,42 @@
         - target_os == 'macos'
         - brew_casks | length > 0
 
-    - name: Check if mas is installed
-      ansible.builtin.command: which mas
-      register: mas_check
-      failed_when: false
+    - name: Ensure mas is available in PATH
+      ansible.builtin.shell: |
+        if command -v mas >/dev/null 2>&1; then
+          echo "found"
+        elif [[ -x /opt/homebrew/bin/mas ]]; then
+          echo "found"
+        elif [[ -x /usr/local/bin/mas ]]; then
+          echo "found"
+        else
+          echo "not found"
+        fi
+      register: mas_availability
       changed_when: false
       when:
         - target_os == 'macos'
         - appstore_apps | length > 0
 
     - name: Check if signed into Mac App Store
-      ansible.builtin.command: mas account
+      ansible.builtin.shell: |
+        export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+        if mas account >/dev/null 2>&1; then
+          echo "signed in"
+        else
+          echo "not signed in"
+        fi
       register: mas_account
-      failed_when: false
       changed_when: false
       when:
         - target_os == 'macos'
         - appstore_apps | length > 0
-        - mas_check.rc == 0
+        - mas_availability.stdout == "found"
 
     - name: Install Mac App Store apps
-      ansible.builtin.command: mas install {{ item }}
+      ansible.builtin.shell: |
+        export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+        mas install {{ item }}
       register: mas_install
       changed_when: "'already installed' not in mas_install.stderr"
       failed_when:
@@ -68,8 +83,17 @@
       when:
         - target_os == 'macos'
         - appstore_apps | length > 0
-        - mas_check.rc == 0
-        - mas_account.rc == 0
+        - mas_availability.stdout == "found"
+        - mas_account.stdout == "signed in"
+
+    - name: Display App Store sign-in reminder
+      ansible.builtin.debug:
+        msg: "Mac App Store apps skipped - please sign into the App Store app and re-run installer"
+      when:
+        - target_os == 'macos'
+        - appstore_apps | length > 0
+        - mas_availability.stdout == "found"
+        - mas_account.stdout != "signed in"
 
     - name: Update apt cache
       become: true

@@ -615,8 +615,8 @@ handle_package_bootstrap() {
     macos)
       if command -v brew >/dev/null 2>&1; then
         ensure_homebrew_in_path
-        mapfile -t pending_macos_brew_formulae < <(filter_missing_packages brew_formulae "${macos_brew_formulae[@]}")
-        mapfile -t pending_macos_brew_casks < <(filter_missing_packages brew_casks "${macos_brew_casks[@]}")
+        IFS=$'\n' read -r -d '' -a pending_macos_brew_formulae < <(filter_missing_packages brew_formulae "${macos_brew_formulae[@]}" && printf '\0')
+        IFS=$'\n' read -r -d '' -a pending_macos_brew_casks < <(filter_missing_packages brew_casks "${macos_brew_casks[@]}" && printf '\0')
       else
         pending_macos_brew_formulae=("${macos_brew_formulae[@]}")
         pending_macos_brew_casks=("${macos_brew_casks[@]}")
@@ -626,15 +626,15 @@ handle_package_bootstrap() {
     linux)
       case "$mgr" in
         apt)
-          mapfile -t pending_linux_apt_packages < <(filter_missing_packages apt "${linux_apt_packages[@]}")
+          IFS=$'\n' read -r -d '' -a pending_linux_apt_packages < <(filter_missing_packages apt "${linux_apt_packages[@]}" && printf '\0')
           ;;
         dnf)
-          mapfile -t pending_linux_dnf_packages < <(filter_missing_packages dnf "${linux_dnf_packages[@]}")
+          IFS=$'\n' read -r -d '' -a pending_linux_dnf_packages < <(filter_missing_packages dnf "${linux_dnf_packages[@]}" && printf '\0')
           ;;
         pacman)
-          mapfile -t pending_linux_pacman_packages < <(filter_missing_packages pacman "${linux_pacman_packages[@]}")
+          IFS=$'\n' read -r -d '' -a pending_linux_pacman_packages < <(filter_missing_packages pacman "${linux_pacman_packages[@]}" && printf '\0')
           if command -v paru >/dev/null 2>&1; then
-            mapfile -t pending_linux_paru_packages < <(filter_missing_packages paru "${linux_paru_packages[@]}")
+            IFS=$'\n' read -r -d '' -a pending_linux_paru_packages < <(filter_missing_packages paru "${linux_paru_packages[@]}" && printf '\0')
           else
             pending_linux_paru_blocked=("${linux_paru_packages[@]}")
           fi

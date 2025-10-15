@@ -306,9 +306,12 @@ filter_missing_packages() {
       ;;
   esac
 
-  for pkg in "${result[@]}"; do
-    printf '%s\n' "$pkg"
-  done
+  # Only iterate if result array has elements
+  if [[ ${#result[@]} -gt 0 ]]; then
+    for pkg in "${result[@]}"; do
+      printf '%s\n' "$pkg"
+    done
+  fi
 }
 
 install_apt_packages() {

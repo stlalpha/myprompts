@@ -32,6 +32,7 @@ VW_BOTTOM_BORDER='<0Oo..........................................................
 
 pending_macos_brew_formulae=()
 pending_macos_brew_casks=()
+pending_macos_appstore_apps=()
 pending_linux_apt_packages=()
 pending_linux_dnf_packages=()
 pending_linux_pacman_packages=()
@@ -156,6 +157,7 @@ load_configuration() {
 
   ensure_array macos_brew_formulae
   ensure_array macos_brew_casks
+  ensure_array macos_appstore_apps
   ensure_array linux_apt_packages
   ensure_array linux_dnf_packages
   ensure_array linux_pacman_packages
@@ -213,6 +215,33 @@ install_brew_casks() {
       info "brew cask '$pkg' already installed."
     else
       brew install --cask "$pkg"
+    fi
+  done
+}
+
+install_appstore_apps() {
+  local packages=("$@")
+  [[ ${#packages[@]} -eq 0 ]] && return
+
+  # Check if mas is installed
+  if ! command -v mas >/dev/null 2>&1; then
+    warn "mas CLI not installed; skipping App Store apps. Install with: brew install mas"
+    return
+  fi
+
+  # Check if user is signed into the App Store
+  if ! mas account >/dev/null 2>&1; then
+    warn "Not signed into Mac App Store; skipping App Store apps. Please sign in via App Store app."
+    return
+  fi
+
+  info "Installing Mac App Store apps: ${packages[*]}"
+  for app_id in "${packages[@]}"; do
+    # Check if app is already installed
+    if mas list | grep -q "^${app_id}[[:space:]]"; then
+      info "App Store app ID '$app_id' already installed."
+    else
+      mas install "$app_id"
     fi
   done
 }
@@ -304,6 +333,19 @@ filter_missing_packages() {
         fi
       done
       ;;
+    appstore)
+      if ! command -v mas >/dev/null 2>&1; then
+        printf '%s\n' "${packages[@]}"
+        return
+      fi
+      for app_id in "${packages[@]}"; do
+        if mas list | grep -q "^${app_id}[[:space:]]"; then
+          info "App Store app ID '$app_id' already installed; skipping." >&2
+        else
+          result+=("$app_id")
+        fi
+      done
+      ;;
   esac
 
   # Only iterate if result array has elements
@@ -368,6 +410,16 @@ generate_ansible_vars() {
       for pkg in "${pending_macos_brew_casks[@]}"; do
         [[ -z $pkg ]] && continue
         printf "  - %s\n" "$pkg"
+      done
+    else
+      printf "  []\n"
+    fi
+
+    printf "appstore_apps:\n"
+    if [[ ${#pending_macos_appstore_apps[@]} -gt 0 ]]; then
+      for app_id in "${pending_macos_appstore_apps[@]}"; do
+        [[ -z $app_id ]] && continue
+        printf "  - %s\n" "$app_id"
       done
     else
       printf "  []\n"
@@ -526,6 +578,15 @@ detect_installed_packages() {
           printf '%s (cask)\n' "$pkg"
         fi
       done
+      if command -v mas >/dev/null 2>&1; then
+        for app_id in "${macos_appstore_apps[@]}"; do
+          if mas list | grep -q "^${app_id}[[:space:]]"; then
+            local app_name
+            app_name=$(mas list | grep "^${app_id}[[:space:]]" | cut -f2-)
+            printf '%s (App Store: %s)\n' "$app_id" "$app_name"
+          fi
+        done
+      fi
       ;;
     linux)
       case "$mgr" in
@@ -594,6 +655,7 @@ handle_package_bootstrap() {
 
   pending_macos_brew_formulae=()
   pending_macos_brew_casks=()
+  pending_macos_appstore_apps=()
   pending_linux_apt_packages=()
   pending_linux_dnf_packages=()
   pending_linux_pacman_packages=()
@@ -626,9 +688,15 @@ handle_package_bootstrap() {
         ensure_homebrew_in_path
         IFS=$'\n' read -r -d '' -a pending_macos_brew_formulae < <(filter_missing_packages brew_formulae "${macos_brew_formulae[@]}" && printf '\0')
         IFS=$'\n' read -r -d '' -a pending_macos_brew_casks < <(filter_missing_packages brew_casks "${macos_brew_casks[@]}" && printf '\0')
+        if command -v mas >/dev/null 2>&1; then
+          IFS=$'\n' read -r -d '' -a pending_macos_appstore_apps < <(filter_missing_packages appstore "${macos_appstore_apps[@]}" && printf '\0')
+        else
+          pending_macos_appstore_apps=("${macos_appstore_apps[@]}")
+        fi
       else
         pending_macos_brew_formulae=("${macos_brew_formulae[@]}")
         pending_macos_brew_casks=("${macos_brew_casks[@]}")
+        pending_macos_appstore_apps=("${macos_appstore_apps[@]}")
         warn "Homebrew not detected; formulae and casks will require manual setup."
       fi
       ;;
@@ -654,11 +722,12 @@ handle_package_bootstrap() {
       ;;
   esac
 
-  local pending_total=$(( ${#pending_macos_brew_formulae[@]} + ${#pending_macos_brew_casks[@]} + ${#pending_linux_apt_packages[@]} + ${#pending_linux_dnf_packages[@]} + ${#pending_linux_pacman_packages[@]} + ${#pending_linux_paru_packages[@]} ))
+  local pending_total=$(( ${#pending_macos_brew_formulae[@]} + ${#pending_macos_brew_casks[@]} + ${#pending_macos_appstore_apps[@]} + ${#pending_linux_apt_packages[@]} + ${#pending_linux_dnf_packages[@]} + ${#pending_linux_pacman_packages[@]} + ${#pending_linux_paru_packages[@]} ))
 
   local summary_parts=()
   [[ ${#pending_macos_brew_formulae[@]} -gt 0 ]] && summary_parts+=("brew:${pending_macos_brew_formulae[*]}")
   [[ ${#pending_macos_brew_casks[@]} -gt 0 ]] && summary_parts+=("casks:${pending_macos_brew_casks[*]}")
+  [[ ${#pending_macos_appstore_apps[@]} -gt 0 ]] && summary_parts+=("appstore:${pending_macos_appstore_apps[*]}")
   [[ ${#pending_linux_apt_packages[@]} -gt 0 ]] && summary_parts+=("apt:${pending_linux_apt_packages[*]}")
   [[ ${#pending_linux_dnf_packages[@]} -gt 0 ]] && summary_parts+=("dnf:${pending_linux_dnf_packages[*]}")
   [[ ${#pending_linux_pacman_packages[@]} -gt 0 ]] && summary_parts+=("pacman:${pending_linux_pacman_packages[*]}")
@@ -681,6 +750,7 @@ handle_package_bootstrap() {
     macos)
       print_pkg_group 'brew formulae' macos_brew_formulae "$VW_ORANGE" >&"$PROMPT_FD"
       print_pkg_group 'brew casks' macos_brew_casks "$VW_PURPLE" >&"$PROMPT_FD"
+      print_pkg_group 'App Store apps' macos_appstore_apps "$VW_CYAN" >&"$PROMPT_FD"
       ;;
     linux)
       case "$mgr" in
@@ -716,6 +786,10 @@ handle_package_bootstrap() {
     fi
     if [[ ${#pending_macos_brew_casks[@]} -gt 0 ]]; then
       print_pkg_list 'brew casks' "$VW_PURPLE" "${pending_macos_brew_casks[@]}" >&"$PROMPT_FD"
+      pending_shown=1
+    fi
+    if [[ ${#pending_macos_appstore_apps[@]} -gt 0 ]]; then
+      print_pkg_list 'App Store apps' "$VW_CYAN" "${pending_macos_appstore_apps[@]}" >&"$PROMPT_FD"
       pending_shown=1
     fi
   else

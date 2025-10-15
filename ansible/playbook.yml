@@ -4,6 +4,7 @@
   vars:
     brew_formulae: []
     brew_casks: []
+    appstore_apps: []
     apt_packages: []
     dnf_packages: []
     pacman_packages: []
@@ -35,6 +36,40 @@
       when:
         - target_os == 'macos'
         - brew_casks | length > 0
+
+    - name: Check if mas is installed
+      ansible.builtin.command: which mas
+      register: mas_check
+      failed_when: false
+      changed_when: false
+      when:
+        - target_os == 'macos'
+        - appstore_apps | length > 0
+
+    - name: Check if signed into Mac App Store
+      ansible.builtin.command: mas account
+      register: mas_account
+      failed_when: false
+      changed_when: false
+      when:
+        - target_os == 'macos'
+        - appstore_apps | length > 0
+        - mas_check.rc == 0
+
+    - name: Install Mac App Store apps
+      ansible.builtin.command: mas install {{ item }}
+      register: mas_install
+      changed_when: "'already installed' not in mas_install.stderr"
+      failed_when:
+        - mas_install.rc != 0
+        - "'already installed' not in mas_install.stderr"
+      loop: "{{ appstore_apps }}"
+      become: false
+      when:
+        - target_os == 'macos'
+        - appstore_apps | length > 0
+        - mas_check.rc == 0
+        - mas_account.rc == 0
 
     - name: Update apt cache
       become: true

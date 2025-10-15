@@ -17,6 +17,7 @@
       register: brew_install
       changed_when: "'already installed' not in brew_install.stdout"
       loop: "{{ brew_formulae }}"
+      become: false
       when:
         - target_os == 'macos'
         - brew_formulae | length > 0
@@ -26,6 +27,7 @@
       register: brew_cask
       changed_when: "'already installed' not in brew_cask.stdout"
       loop: "{{ brew_casks }}"
+      become: false
       when:
         - target_os == 'macos'
         - brew_casks | length > 0

@@ -493,12 +493,16 @@ run_ansible_bootstrap() {
     return
   fi
 
-  local become_args=(-b)
-  if ! sudo -n true 2>/dev/null; then
-    become_args+=(-K)
+  # Only request sudo for Linux systems that need it
+  local ansible_args=()
+  if [[ $os == linux ]]; then
+    ansible_args+=(-b)
+    if ! sudo -n true 2>/dev/null; then
+      ansible_args+=(-K)
+    fi
   fi
 
-  ANSIBLE_NOCOWS=1 ANSIBLE_FORCE_COLOR=1 ansible-playbook -i localhost, -c local -e "@$vars_file" "$playbook" "${become_args[@]}"
+  ANSIBLE_NOCOWS=1 ANSIBLE_FORCE_COLOR=1 ansible-playbook -i localhost, -c local -e "@$vars_file" "$playbook" "${ansible_args[@]}"
 }
 
 detect_installed_packages() {

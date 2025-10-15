@@ -72,7 +72,13 @@
         - appstore_apps | length > 0
         - mas_result is defined
 
-    # Add Magnet to login items if it was installed
+    # Add Magnet to login items if it exists on the system
+    - name: Check if Magnet is installed
+      ansible.builtin.stat:
+        path: /Applications/Magnet.app
+      register: magnet_app
+      when: target_os == 'macos'
+
     - name: Add Magnet to login items
       ansible.builtin.shell: |
         # Check if Magnet is already in login items
@@ -87,7 +93,7 @@
       failed_when: false
       when:
         - target_os == 'macos'
-        - 441258766 in appstore_apps or "441258766" in appstore_apps  # Magnet's App Store ID (handle both string and int)
+        - magnet_app.stat.exists | default(false)
 
     - name: Update apt cache
       become: true

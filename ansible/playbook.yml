@@ -87,7 +87,7 @@
       failed_when: false
       when:
         - target_os == 'macos'
-        - "'441258766' in appstore_apps"  # Magnet's App Store ID
+        - 441258766 in appstore_apps or "441258766" in appstore_apps  # Magnet's App Store ID (handle both string and int)
 
     - name: Update apt cache
       become: true

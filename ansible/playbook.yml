@@ -72,6 +72,23 @@
         - appstore_apps | length > 0
         - mas_result is defined
 
+    # Add Magnet to login items if it was installed
+    - name: Add Magnet to login items
+      ansible.builtin.shell: |
+        # Check if Magnet is already in login items
+        if ! osascript -e 'tell application "System Events" to get the name of every login item' | grep -q "Magnet"; then
+          osascript -e 'tell application "System Events" to make login item at end with properties {path:"/Applications/Magnet.app", hidden:false}'
+          echo "Added Magnet to login items"
+        else
+          echo "Magnet already in login items"
+        fi
+      register: login_item_result
+      changed_when: "'Added Magnet to login items' in login_item_result.stdout"
+      failed_when: false
+      when:
+        - target_os == 'macos'
+        - "'441258766' in appstore_apps"  # Magnet's App Store ID
+
     - name: Update apt cache
       become: true
       ansible.builtin.command: apt-get update -y

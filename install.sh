@@ -659,8 +659,14 @@ handle_package_bootstrap() {
     pending_summary=$(IFS=', '; echo "${summary_parts[*]}")
   fi
 
+  local os_display
+  case "$os" in
+    macos) os_display="macOS" ;;
+    linux) os_display="Linux" ;;
+    *) os_display="Unknown" ;;
+  esac
   printf '\n%b%s%b %bPackage Setup%b for %s (%s)%b\n' \
-    "$VW_PINK" "$VW_SECTION_ICON" "$VW_RESET" "$VW_CYAN" "$VW_RESET" "${os^}" "$mgr_label" "$VW_RESET" >&"$PROMPT_FD"
+    "$VW_PINK" "$VW_SECTION_ICON" "$VW_RESET" "$VW_CYAN" "$VW_RESET" "$os_display" "$mgr_label" "$VW_RESET" >&"$PROMPT_FD"
 
   case "$os" in
     macos)
@@ -760,7 +766,12 @@ handle_package_bootstrap() {
     printf '\nPrevious bootstrap detected at %s/.packages-installed\n' "${INSTALL_ROOT/#$HOME/~}" >&"$PROMPT_FD"
   fi
 
-  local os_label=${os^}
+  local os_label
+  case "$os" in
+    macos) os_label="macOS" ;;
+    linux) os_label="Linux" ;;
+    *) os_label="Unknown" ;;
+  esac
   local prompt_text="Install/Update ${os_label} packages? (pending: ${pending_summary})"
   if prompt_yes_no "$prompt_text" "$default_answer"; then
     run_ansible_bootstrap "$os" "$mgr"
@@ -824,7 +835,12 @@ handle_existing_install() {
   summary=$(describe_install_state "$INSTALL_ROOT")
 
   if (( ! INTERACTIVE )); then
-    error "${summary^}; run interactively to confirm reinstall."
+    # Capitalize first letter of summary
+    local first_char first_upper rest
+    first_char=${summary:0:1}
+    rest=${summary:1}
+    first_upper=$(echo "$first_char" | tr '[:lower:]' '[:upper:]')
+    error "${first_upper}${rest}; run interactively to confirm reinstall."
     exit 1
   fi
 
@@ -843,7 +859,8 @@ if prompt_yes_no "Proceed with reinstall?" N; then
 prompt_yes_no() {
   local message=$1
   local default=${2:-Y}
-  local default_lower=${default,,}
+  local default_lower
+  default_lower=$(echo "$default" | tr '[:upper:]' '[:lower:]')
 
   if (( ! INTERACTIVE )); then
     [[ $default_lower == y* ]]
@@ -863,7 +880,7 @@ prompt_yes_no() {
       exit 1
     fi
     reply=${reply:-$default}
-    reply=${reply,,}
+    reply=$(echo "$reply" | tr '[:upper:]' '[:lower:]')
     case "$reply" in
       y|yes) return 0 ;;
       n|no)  return 1 ;;
@@ -879,7 +896,7 @@ choose_prompt_variant() {
 
   if (( ! INTERACTIVE )); then
     preset=${PROMPT_VARIANT:-}
-    preset=${preset,,}
+    preset=$(echo "$preset" | tr '[:upper:]' '[:lower:]')
     case "$preset" in
       liquid|animated)
         selection="$PROMPT_LIQUID"
@@ -941,7 +958,7 @@ choose_prompt_style() {
   local selection=""
   if (( ! INTERACTIVE )); then
     preset=${PROMPT_STYLE:-}
-    preset=${preset,,}
+    preset=$(echo "$preset" | tr '[:upper:]' '[:lower:]')
     case "$preset" in
       extended|multi-line)
         selection="extended"
@@ -956,7 +973,7 @@ choose_prompt_style() {
   fi
 
   local current=${MYPROMPTS_PROMPT_STYLE:-compact}
-  current=${current,,}
+  current=$(echo "$current" | tr '[:upper:]' '[:lower:]')
   local default_choice_num=1
   local default_choice_label="Compact"
   if [[ $current == extended ]]; then
@@ -1075,7 +1092,11 @@ main() {
   local os_type
   os_type=$(detect_os)
   local os_type_display
-  os_type_display=$(echo "$os_type" | sed 's/./\U&/')
+  case "$os_type" in
+    macos) os_type_display="macOS" ;;
+    linux) os_type_display="Linux" ;;
+    *) os_type_display="Unknown" ;;
+  esac
   info "Operating system detected: $os_type_display"
   handle_package_bootstrap "$os_type"
 

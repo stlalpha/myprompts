@@ -17,7 +17,7 @@ macos_brew_casks=(
 # Mac App Store apps (requires mas CLI)
 # Find app IDs with: mas search "app name"
 macos_appstore_apps=(
-  587512244   # Magnet (window manager)
+  441258766   # Magnet (window manager)
   # 409183694   # Keynote
   # 409201541   # Pages
   # 409203825   # Numbers

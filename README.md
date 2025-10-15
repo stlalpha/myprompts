@@ -8,18 +8,19 @@ Vaporwave-themed shell prompts with automated system configuration.
 - Animated and static prompt variants
 - Custom LS colors matching the vaporwave aesthetic
 - Automated package installation via Ansible
+- Mac App Store app installation support (macOS)
 - Cross-platform support (macOS, Linux)
 
 ## Installation
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/[username]/myprompts/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/stlalpha/myprompts/main/install.sh | bash
 ```
 
 Or clone and run locally:
 
 ```bash
-git clone https://github.com/[username]/myprompts.git
+git clone https://github.com/stlalpha/myprompts.git
 cd myprompts
 bash install.sh
 ```
@@ -58,8 +59,21 @@ export MYPROMPTS_PROMPT_STYLE=compact   # or extended
 Edit `config/packages.sh` to customize installed packages per platform:
 
 ```bash
-macos_brew_formulae=(gh nmap netcat)
+macos_brew_formulae=(mas gh nmap netcat)
+macos_brew_casks=(iterm2 bettertouchtool)
+macos_appstore_apps=(441258766)  # Magnet window manager
 linux_apt_packages=(nmap netcat)
+```
+
+### Mac App Store Apps (macOS)
+
+**Important**: You must sign in to the Mac App Store app before the installer can install App Store apps.
+
+The `mas account` command is broken on macOS 12+ due to Apple framework changes. The installer uses the community.general.mas Ansible module which attempts installation regardless and handles failures gracefully.
+
+To find App Store app IDs:
+```bash
+mas search "app name"
 ```
 
 ### Shell Aliases

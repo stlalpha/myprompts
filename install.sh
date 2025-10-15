@@ -539,6 +539,14 @@ run_ansible_bootstrap() {
     return
   fi
 
+  # Install required Ansible collections if requirements file exists
+  local requirements_url="$BASE_URL/ansible/requirements.yml"
+  local requirements_file="$INSTALL_ROOT/ansible/requirements.yml"
+  if curl -fsSL "$requirements_url" -o "$requirements_file" 2>/dev/null; then
+    info "Installing required Ansible collections..."
+    ansible-galaxy collection install -r "$requirements_file" --force >/dev/null 2>&1 || true
+  fi
+
   local vars_file="$CONFIG_TMP_DIR/ansible_vars.yml"
   generate_ansible_vars "$vars_file" "$os" "$mgr"
 

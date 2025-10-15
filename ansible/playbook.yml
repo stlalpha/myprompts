@@ -37,63 +37,40 @@
         - target_os == 'macos'
         - brew_casks | length > 0
 
-    - name: Ensure mas is available in PATH
-      ansible.builtin.shell: |
-        if command -v mas >/dev/null 2>&1; then
-          echo "found"
-        elif [[ -x /opt/homebrew/bin/mas ]]; then
-          echo "found"
-        elif [[ -x /usr/local/bin/mas ]]; then
-          echo "found"
-        else
-          echo "not found"
-        fi
-      register: mas_availability
-      changed_when: false
-      when:
-        - target_os == 'macos'
-        - appstore_apps | length > 0
-
-    - name: Check if signed into Mac App Store
-      ansible.builtin.shell: |
-        export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
-        if mas account >/dev/null 2>&1; then
-          echo "signed in"
-        else
-          echo "not signed in"
-        fi
-      register: mas_account
-      changed_when: false
-      when:
-        - target_os == 'macos'
-        - appstore_apps | length > 0
-        - mas_availability.stdout == "found"
-
+    # Note: mas account command is broken on macOS 12+ due to Apple framework changes
+    # See: https://github.com/mas-cli/mas/issues/417
+    # Users must sign in through Mac App Store app before running installer
     - name: Install Mac App Store apps
-      ansible.builtin.shell: |
-        export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
-        mas install {{ item }}
-      register: mas_install
-      changed_when: "'already installed' not in mas_install.stderr"
-      failed_when:
-        - mas_install.rc != 0
-        - "'already installed' not in mas_install.stderr"
+      community.general.mas:
+        id: "{{ item }}"
+        state: present
       loop: "{{ appstore_apps }}"
       become: false
       when:
         - target_os == 'macos'
         - appstore_apps | length > 0
-        - mas_availability.stdout == "found"
-        - mas_account.stdout == "signed in"
+      register: mas_result
+      failed_when: false  # Handle failures gracefully since sign-in detection is broken
+      ignore_errors: true
 
-    - name: Display App Store sign-in reminder
+    - name: Display App Store installation status
       ansible.builtin.debug:
-        msg: "Mac App Store apps skipped - please sign into the App Store app and re-run installer"
+        msg: |
+          {% if mas_result.results is defined %}
+          Mac App Store installation results:
+          {% for result in mas_result.results %}
+          - App ID {{ result.item }}: {% if result.failed | default(false) %}Failed ({{ result.msg | default('Ensure you are signed into Mac App Store') }}){% elif result.changed %}Installed{% else %}Already installed{% endif %}
+          {% endfor %}
+
+          Note: You must sign in to the Mac App Store app before installing apps.
+          The 'mas account' command is broken on macOS 12+ due to Apple framework changes.
+          {% else %}
+          Mac App Store apps installation was skipped or had no results.
+          {% endif %}
       when:
         - target_os == 'macos'
         - appstore_apps | length > 0
-        - mas_availability.stdout == "found"
-        - mas_account.stdout != "signed in"
+        - mas_result is defined
 
     - name: Update apt cache
       become: true

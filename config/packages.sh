@@ -6,6 +6,7 @@ macos_brew_formulae=(
   gh
   nmap
   netcat
+  neofetch
 )
 
 macos_brew_casks=(
@@ -27,15 +28,18 @@ macos_appstore_apps=(
 linux_apt_packages=(
   nmap
   netcat
+  neofetch
 )
 
 linux_dnf_packages=(
   nmap
   nmap-ncat
+  neofetch
 )
 
 linux_pacman_packages=(
   nmap
+  neofetch
 )
 
 linux_paru_packages=(

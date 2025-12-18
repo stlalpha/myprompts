@@ -1226,6 +1226,13 @@ main() {
   download_asset "$PROMPT_ZSH"
   download_asset "$LS_COLORS_FILE"
 
+  info "Installing neofetch configuration"
+  mkdir -p "$HOME/.config/neofetch"
+  curl -fsSL "$BASE_URL/neofetch/config.conf" -o "$HOME/.config/neofetch/config.conf"
+  curl -fsSL "$BASE_URL/neofetch/signalmine.txt" -o "$HOME/.config/neofetch/signalmine.txt"
+  chmod 644 "$HOME/.config/neofetch/config.conf"
+  chmod 644 "$HOME/.config/neofetch/signalmine.txt"
+
   printf 'installed %s\n' "$(date -u +%FT%TZ)" >"$INSTALL_ROOT/.install-meta"
 
   local default_shell

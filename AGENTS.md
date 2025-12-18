@@ -53,3 +53,5 @@
 - Keep local copies of prompts under version control; do not edit the installed dotfiles directly.
 - Extend `config/packages.sh`/`config/aliases.sh` to add software or aliases; keep entries grouped per OS/package manager (e.g., `linux_paru_packages` for AUR installs).
 - Document any terminal-specific tweaks (e.g., iTerm color profiles) in the PR to inform reviewers and downstream users.
+
+BEFORE ANYTHING ELSE: run 'bd onboard' and follow the instructions

@@ -1070,6 +1070,65 @@ choose_prompt_variant() {
   printf -v "$__out_var" '%s' "$selection"
 }
 
+choose_neofetch_style() {
+  local __out_var=$1
+  local preset=""
+  local selection=""
+
+  if (( ! INTERACTIVE )); then
+    preset=${NEOFETCH_STYLE:-}
+    preset=$(echo "$preset" | tr '[:upper:]' '[:lower:]')
+    case "$preset" in
+      boxed|minimal)
+        selection="config-boxed.conf"
+        ;;
+      vaporwave|classic|"")
+        selection="config-vaporwave.conf"
+        ;;
+      *) error "Unknown NEOFETCH_STYLE '$preset'; expected 'vaporwave' or 'boxed'."; exit 1 ;;
+    esac
+    printf -v "$__out_var" '%s' "$selection"
+    return
+  fi
+
+  local reset=$'\033[0m'
+  local pink=$'\033[38;5;198m'
+  local cyan=$'\033[38;5;51m'
+  local purple=$'\033[38;5;141m'
+  local orange=$'\033[38;5;209m'
+  local green=$'\033[38;5;85m'
+  local teal=$'\033[38;5;44m'
+  local dark_teal=$'\033[38;5;24m'
+
+  printf '\nNeofetch style options:\n' >&"$PROMPT_FD"
+  printf '  [1] Vaporwave – colorful with ◆ diamonds and 【】 headers\n' >&"$PROMPT_FD"
+  printf '      %s◆%s User  %s◆%s OS  %s◆%s Host  %s【%sHARDWARE%s】%s\n' \
+    "$pink" "$reset" "$cyan" "$reset" "$purple" "$reset" "$pink" "$cyan" "$pink" "$reset" >&"$PROMPT_FD"
+  printf '  [2] Boxed – minimal with .---. borders, cyan/teal\n' >&"$PROMPT_FD"
+  printf '      %s.---%s  User: ...  %s---.%s\n' \
+    "$teal" "$reset" "$teal" "$reset" >&"$PROMPT_FD"
+
+  local choice
+  while true; do
+    if ! printf 'Select neofetch style [1-2] (default: 1): ' >&"$PROMPT_FD"; then
+      error "Failed to display neofetch style question."
+      exit 1
+    fi
+    if ! IFS= read -r -u "$PROMPT_FD" choice; then
+      error "Failed to read response; aborting installation."
+      exit 1
+    fi
+    choice=${choice:-1}
+    case "$choice" in
+      1) selection="config-vaporwave.conf"; break ;;
+      2) selection="config-boxed.conf"; break ;;
+      *) printf 'Please enter 1 or 2.\n' >&"$PROMPT_FD" ;;
+    esac
+  done
+
+  printf -v "$__out_var" '%s' "$selection"
+}
+
 choose_prompt_style() {
   local __out_var=$1
   local preset=""
@@ -1228,10 +1287,18 @@ main() {
 
   info "Installing neofetch configuration"
   mkdir -p "$HOME/.config/neofetch"
-  curl -fsSL "$BASE_URL/neofetch/config.conf" -o "$HOME/.config/neofetch/config.conf"
+  mkdir -p "$INSTALL_ROOT/neofetch"
+  curl -fsSL "$BASE_URL/neofetch/config-vaporwave.conf" -o "$INSTALL_ROOT/neofetch/config-vaporwave.conf"
+  curl -fsSL "$BASE_URL/neofetch/config-boxed.conf" -o "$INSTALL_ROOT/neofetch/config-boxed.conf"
   curl -fsSL "$BASE_URL/neofetch/signalmine.txt" -o "$HOME/.config/neofetch/signalmine.txt"
-  chmod 644 "$HOME/.config/neofetch/config.conf"
+  chmod 644 "$INSTALL_ROOT/neofetch/config-vaporwave.conf"
+  chmod 644 "$INSTALL_ROOT/neofetch/config-boxed.conf"
   chmod 644 "$HOME/.config/neofetch/signalmine.txt"
+  local neofetch_style=""
+  choose_neofetch_style neofetch_style
+  info "Using $neofetch_style for neofetch"
+  cp "$INSTALL_ROOT/neofetch/$neofetch_style" "$HOME/.config/neofetch/config.conf"
+  chmod 644 "$HOME/.config/neofetch/config.conf"
 
   printf 'installed %s\n' "$(date -u +%FT%TZ)" >"$INSTALL_ROOT/.install-meta"
 

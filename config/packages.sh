@@ -27,7 +27,7 @@ macos_appstore_apps=(
 # Linux packages per package manager (extendable)
 linux_apt_packages=(
   nmap
-  netcat
+  netcat-openbsd
   neofetch
 )
 

@@ -11,12 +11,24 @@ test_theme_defines_all_roles() {
     local theme=$1
     test_start "themes/$theme.sh defines every role"
     local missing=""
+    local source_failed=""
     for role in $ROLES; do
-        local val
-        val=$("$BASH32" -c "set -u; source ./themes/$theme.sh; printf '%s' \"\${$role:-}\"" 2>&1)
+        local val status
+        val=$("$BASH32" -c "set -u; source ./themes/$theme.sh || exit 42; printf '%s' \"\${$role:-}\"" 2>/dev/null)
+        status=$?
+        if [ "$status" -ne 0 ]; then
+            source_failed=1
+            break
+        fi
         [ -n "$val" ] || missing="$missing $role"
     done
-    if [ -z "$missing" ]; then test_pass; else test_fail "missing:$missing"; fi
+    if [ -n "$source_failed" ]; then
+        test_fail "theme file failed to source"
+    elif [ -n "$missing" ]; then
+        test_fail "sourced fine but these roles are missing:$missing"
+    else
+        test_pass
+    fi
 }
 
 test_role_format() {

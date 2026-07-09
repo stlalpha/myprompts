@@ -8,10 +8,16 @@ NC='\033[0m'
 TESTS_RUN=0
 TESTS_PASSED=0
 TESTS_FAILED=0
+TESTS_SKIPPED=0
 
 test_start() {
     TESTS_RUN=$((TESTS_RUN + 1))
     printf 'Testing %s... ' "$1"
+}
+
+test_skip() {
+    TESTS_SKIPPED=$((TESTS_SKIPPED + 1))
+    printf 'Testing %s... SKIPPED (%s)\n' "$1" "$2"
 }
 
 test_pass() {
@@ -45,6 +51,6 @@ assert_contains() {
 }
 
 test_summary() {
-    printf '\n%s run, %s passed, %s failed\n' "$TESTS_RUN" "$TESTS_PASSED" "$TESTS_FAILED"
+    printf '\n%s run, %s passed, %s failed, %s skipped\n' "$TESTS_RUN" "$TESTS_PASSED" "$TESTS_FAILED" "$TESTS_SKIPPED"
     [ "$TESTS_FAILED" -eq 0 ]
 }

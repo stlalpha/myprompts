@@ -9,12 +9,29 @@ source ./test_helpers.sh
 # Bash 3.2 is the floor: macOS ships 3.2.57 as /bin/bash.
 BASH32=/bin/bash
 
+# Interrogate the actual bash under test (not the shell running this script —
+# on Linux CI /bin/bash is typically 5.x, so the 3.2-only regression this
+# suite was written for cannot reproduce there).
+bash32_version=$("$BASH32" --version | head -n 1 | grep -Eo '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -n 1)
+bash32_major=${bash32_version%%.*}
+
+if [ -n "$bash32_major" ] && [ "$bash32_major" -ge 4 ] 2>/dev/null; then
+    printf '[env] %s is %s — bash 3.2 regression coverage: NO (macOS runner provides it)\n' "$BASH32" "$bash32_version"
+else
+    printf '[env] %s is %s — bash 3.2 regression coverage: YES\n' "$BASH32" "$bash32_version"
+fi
+
 # Returns the layout a given style string actually produces. The extended
 # layout is the only one containing a newline, so that is the discriminator.
+# An empty result means the nested bash never assigned PS1 at all (e.g. it
+# crashed before reaching the assignment) — report that as 'error' rather
+# than silently falling back to 'compact', which would let the assertion
+# pass vacuously.
 prompt_layout_for_style() {
     local ps1
     ps1=$("$BASH32" -c "MYPROMPTS_PROMPT_STYLE=$1 source ./vaporwave_bash_prompt 2>/dev/null; printf '%s' \"\$PS1\"")
     case "$ps1" in
+        '') printf 'error' ;;
         *$'\n'*) printf 'extended' ;;
         *) printf 'compact' ;;
     esac
@@ -23,6 +40,18 @@ prompt_layout_for_style() {
 # NOTE: bash does NOT abort on `bad substitution` inside a sourced file — it
 # prints to stderr and keeps going, so `source` still returns 0. Asserting on
 # the exit status would silently pass. Assert on stderr instead.
+# Static, platform-independent check: bash-4-only case-modification parameter
+# expansions (${var,,}, ${var,}, ${var^^}, ${var^}) are a hard "bad
+# substitution" under bash 3.2. This must fail on any bash, macOS or Linux.
+test_no_bash4_only_syntax() {
+    test_start "vaporwave_bash_prompt has no bash-4-only case-modification expansions"
+    if grep -Eq '\$\{[A-Za-z_][A-Za-z0-9_]*(\^\^|,,|\^|,)\}' vaporwave_bash_prompt; then
+        test_fail "found \${var,,}/\${var,}/\${var^^}/\${var^} — bash 4+ only, breaks under bash 3.2"
+    else
+        test_pass
+    fi
+}
+
 test_bash_prompt_sources_silently_under_bash32() {
     test_start "vaporwave_bash_prompt sources without stderr output under bash 3.2"
     local err
@@ -54,6 +83,11 @@ test_bash_prompt_style_is_case_insensitive() {
     assert_eq "compact" "$(prompt_layout_for_style compact)" "layout for style 'compact'"
 }
 
+if [ -n "$bash32_major" ] && [ "$bash32_major" -ge 4 ] 2>/dev/null; then
+    test_skip "bash 3.2 regression reproduction" "\$BASH32 is bash $bash32_version, not 3.2 — cannot reproduce the bad-substitution symptom here"
+fi
+
+test_no_bash4_only_syntax
 test_bash_prompt_sources_silently_under_bash32
 test_bash_prompt_sets_ps1
 test_bash_prompt_style_is_case_insensitive

@@ -44,9 +44,8 @@ test_role_format() {
 test_mp_fg_256() {
     test_start "mp_fg emits a 256-color code when COLORTERM is unset"
     local out
-    # shellcheck disable=SC1007,SC2016
-    # COLORTERM= clears the var for the subprocess (not an assignment typo);
-    # single quotes keep $-expansion inside the nested bash -c.
+    # shellcheck disable=SC1007
+    # COLORTERM= clears the var for the subprocess (not an assignment typo).
     out=$(COLORTERM= "$BASH32" -c 'set -u; source ./lib/prompt_common.sh; mp_fg 198:FF0090' | cat -v)
     assert_eq '^[[38;5;198m' "$out" "256-color output"
 }
@@ -54,8 +53,6 @@ test_mp_fg_256() {
 test_mp_fg_truecolor() {
     test_start "mp_fg emits a 24-bit code when COLORTERM=truecolor"
     local out
-    # shellcheck disable=SC2016
-    # Single quotes are intentional: expansion happens in the nested bash -c.
     out=$(COLORTERM=truecolor "$BASH32" -c 'set -u; source ./lib/prompt_common.sh; mp_fg 198:FF0090' | cat -v)
     assert_eq '^[[38;2;255;0;144m' "$out" "truecolor output"
 }

@@ -22,7 +22,7 @@ test_pass() {
 test_fail() {
     TESTS_FAILED=$((TESTS_FAILED + 1))
     printf '%b\n' "${RED}✗${NC}"
-    printf '%b\n' "  ${RED}Failed: $1${NC}"
+    printf '  %bFailed: %s%b\n' "${RED}" "$1" "${NC}"
 }
 
 assert_eq() {
@@ -34,6 +34,10 @@ assert_eq() {
 }
 
 assert_contains() {
+    if [ -z "$2" ]; then
+        test_fail "$3 (assertion error: empty needle)"
+        return
+    fi
     case "$1" in
         *"$2"*) test_pass ;;
         *) test_fail "$3 (expected '$1' to contain '$2')" ;;

@@ -230,13 +230,28 @@ source ./test_helpers.sh
 # Bash 3.2 is the floor: macOS ships 3.2.57 as /bin/bash.
 BASH32=/bin/bash
 
-test_bash_prompt_sources_under_bash32() {
-    test_start "vaporwave_bash_prompt sources under bash 3.2"
+# Returns the layout a given style string actually produces. The extended
+# layout is the only one containing a newline, so that is the discriminator.
+prompt_layout_for_style() {
+    local ps1
+    ps1=$("$BASH32" -c "MYPROMPTS_PROMPT_STYLE=$1 source ./vaporwave_bash_prompt 2>/dev/null; printf '%s' \"\$PS1\"")
+    case "$ps1" in
+        *$'\n'*) printf 'extended' ;;
+        *) printf 'compact' ;;
+    esac
+}
+
+# NOTE: bash does NOT abort on `bad substitution` inside a sourced file — it
+# prints to stderr and keeps going, so `source` still returns 0. Asserting on
+# the exit status would silently pass. Assert on stderr instead.
+test_bash_prompt_sources_silently_under_bash32() {
+    test_start "vaporwave_bash_prompt sources without stderr output under bash 3.2"
     local err
-    if err=$("$BASH32" -c 'MYPROMPTS_PROMPT_STYLE=compact source ./vaporwave_bash_prompt' 2>&1); then
+    err=$("$BASH32" -c 'MYPROMPTS_PROMPT_STYLE=compact source ./vaporwave_bash_prompt' 2>&1 >/dev/null)
+    if [ -z "$err" ]; then
         test_pass
     else
-        test_fail "sourcing failed: $err"
+        test_fail "sourcing wrote to stderr: $err"
     fi
 }
 
@@ -247,18 +262,39 @@ test_bash_prompt_sets_ps1() {
     if [ -n "$out" ]; then test_pass; else test_fail "PS1 was empty"; fi
 }
 
-test_bash_prompt_sources_under_bash32
+# The failed `${style,,}` assignment leaves $style uppercased, so an uppercase
+# style silently falls through to the compact branch.
+test_bash_prompt_style_is_case_insensitive() {
+    local s
+    for s in extended EXTENDED Extended; do
+        test_start "MYPROMPTS_PROMPT_STYLE=$s selects the extended layout"
+        assert_eq "extended" "$(prompt_layout_for_style "$s")" "layout for style '$s'"
+    done
+    test_start "MYPROMPTS_PROMPT_STYLE=compact selects the compact layout"
+    assert_eq "compact" "$(prompt_layout_for_style compact)" "layout for style 'compact'"
+}
+
+test_bash_prompt_sources_silently_under_bash32
 test_bash_prompt_sets_ps1
+test_bash_prompt_style_is_case_insensitive
 test_summary
 ```
 
 - [ ] **Step 2: Run it and confirm it FAILS**
 
 Run: `chmod +x test_prompts.sh && ./test_prompts.sh`
-Expected: FAIL. The first test reports
-`sourcing failed: ./vaporwave_bash_prompt: line 30: ${style,,}: bad substitution`
+Expected: FAIL, exactly two of the five tests:
 
-If it passes, the bug is already fixed and something is wrong — stop and
+1. `sources without stderr output` fails with
+   `sourcing wrote to stderr: ./vaporwave_bash_prompt: line 30: ${style,,}: bad substitution`
+2. `MYPROMPTS_PROMPT_STYLE=EXTENDED selects the extended layout` fails with
+   `expected 'extended', got 'compact'` — and likewise for `Extended`.
+
+`sets a non-empty PS1`, the lowercase `extended` case, and the `compact` case
+all PASS today. That is expected: bash continues past the bad substitution, so
+`PS1` is still assigned and lowercase input never needed lowercasing.
+
+If all five pass, the bug is already fixed and something is wrong — stop and
 investigate rather than proceeding.
 
 - [ ] **Step 3: Commit the failing test**
@@ -307,17 +343,29 @@ Same two lines, same replacement.
 - [ ] **Step 3: Run the test and confirm it PASSES**
 
 Run: `./test_prompts.sh`
-Expected: `2 run, 2 passed, 0 failed`, exit 0.
+Expected: `5 run, 5 passed, 0 failed`, exit 0.
 
-- [ ] **Step 4: Verify the fix under Bash 4+ too, so both styles still work**
+- [ ] **Step 4: Verify the two symptoms are gone, directly**
 
-Run:
+Sourcing must now be silent. `source` returns 0 either way, so check stderr:
+
 ```bash
-for s in compact extended COMPACT Extended; do
-  /bin/bash -c "MYPROMPTS_PROMPT_STYLE=$s source ./vaporwave_bash_prompt && printf '%s: ok\n' '$s'"
+err=$(/bin/bash -c 'source ./vaporwave_bash_prompt' 2>&1 >/dev/null)
+[ -z "$err" ] && echo "silent: ok" || echo "STILL NOISY: $err"
+```
+Expected: `silent: ok`.
+
+And uppercase styles must now select the extended layout (it contains a newline):
+
+```bash
+for s in extended EXTENDED Extended compact; do
+  ps1=$(/bin/bash -c "MYPROMPTS_PROMPT_STYLE=$s source ./vaporwave_bash_prompt 2>/dev/null; printf '%s' \"\$PS1\"")
+  case "$ps1" in *$'\n'*) l=extended ;; *) l=compact ;; esac
+  printf '  %-10s -> %s\n' "$s" "$l"
 done
 ```
-Expected: four `ok` lines. The uppercase cases prove the `tr` lowercasing works.
+Expected: `extended`, `EXTENDED`, `Extended` all map to `extended`; `compact`
+maps to `compact`.
 
 - [ ] **Step 5: Commit**
 

@@ -17,8 +17,19 @@ Claims below were checked against the machine, not asserted from memory.
 
 - **Confirmed bug.** `vaporwave_bash_prompt:30` and `vaporwave_liquid_prompt:90`
   use `${style,,}`, which is Bash 4+ syntax. Under `/bin/bash` (3.2.57 on
-  Darwin 25) sourcing fails: `${style,,}: bad substitution`. Both Bash prompts
-  are broken in a stock macOS Bash shell.
+  Darwin 25) this is `${style,,}: bad substitution`.
+
+  Corrected during implementation: bash does **not** abort on this. It prints to
+  stderr and continues, and `source` still returns 0. So the prompt does load.
+  The two real symptoms are:
+
+  1. Every new shell prints `bad substitution` to stderr.
+  2. Case-insensitive style selection is broken. The failed assignment leaves
+     `$style` uppercased, so `MYPROMPTS_PROMPT_STYLE=EXTENDED` silently falls
+     through to the compact branch. Lowercase `extended` works by accident.
+
+  A regression test must therefore assert on **stderr and on the selected
+  layout**, never on the exit status of `source` — that would pass vacuously.
 - **Not a bug.** `date +%N` was assumed unsupported on macOS. It works
   (`/bin/date +%N` → nanoseconds). Recent Darwin supports it.
 - **Not a bug.** `neofetch` (7.1.0) and `netcat` (0.7.1) are both still

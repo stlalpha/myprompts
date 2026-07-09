@@ -26,8 +26,9 @@ git_branch() {
     git branch 2> /dev/null | sed -e '/^[^*]/d' -e 's/* \(.*\)/『\1』/'
 }
 
+# Lowercase via tr, not the bash-4-only ,, expansion: macOS ships bash 3.2.
 style="${MYPROMPTS_PROMPT_STYLE:-compact}"
-style=${style,,}
+style=$(printf '%s' "$style" | tr '[:upper:]' '[:lower:]')
 
 if [[ $style == extended ]]; then
     PS1="${NEON_PINK}◤${NEON_CYAN}\u${NEON_PINK}◢${RESET}"

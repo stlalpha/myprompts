@@ -9,6 +9,18 @@ source ./test_helpers.sh
 # Bash 3.2 is the floor: macOS ships 3.2.57 as /bin/bash.
 BASH32=/bin/bash
 
+# `timeout` is a GNU coreutils tool, not part of stock macOS -- only use it as
+# a hang-guard when present, so a regression that reintroduces unbounded
+# recursion doesn't wedge the whole suite. Fall back to running unbounded on
+# a system without it (correct either way, just without the safety net).
+run_bounded() {
+    if command -v timeout >/dev/null 2>&1; then
+        timeout 5 "$@"
+    else
+        "$@"
+    fi
+}
+
 # Interrogate the actual bash under test (not the shell running this script —
 # on Linux CI /bin/bash is typically 5.x, so the 3.2-only regression this
 # suite was written for cannot reproduce there).
@@ -101,6 +113,7 @@ strip_ansi() { sed 's/\x1b\[[0-9;]*m//g'; }
 test_exit_status_segment() {
     test_start "prompt shows the exit code of a failing command"
     local out
+    # shellcheck disable=SC2016 # single-quoted: expands inside the nested bash -c, not here
     out=$("$BASH32" -c '
         source ./vaporwave_bash_prompt >/dev/null 2>&1
         (exit 42); myprompts_build_ps1
@@ -111,6 +124,7 @@ test_exit_status_segment() {
 test_no_exit_status_on_success() {
     test_start "prompt omits the exit code after a successful command"
     local out
+    # shellcheck disable=SC2016 # single-quoted: expands inside the nested bash -c, not here
     out=$("$BASH32" -c '
         source ./vaporwave_bash_prompt >/dev/null 2>&1
         true; myprompts_build_ps1
@@ -124,6 +138,7 @@ test_no_exit_status_on_success() {
 test_duration_segment_above_threshold() {
     test_start "prompt shows duration above MYPROMPTS_DURATION_MIN"
     local out
+    # shellcheck disable=SC2016 # single-quoted: expands inside the nested bash -c, not here
     out=$(MYPROMPTS_DURATION_MIN=5 "$BASH32" -c '
         source ./vaporwave_bash_prompt >/dev/null 2>&1
         myprompts_timer=$((SECONDS - 9)); myprompts_build_ps1
@@ -134,6 +149,7 @@ test_duration_segment_above_threshold() {
 test_duration_segment_below_threshold() {
     test_start "prompt omits duration below MYPROMPTS_DURATION_MIN"
     local out
+    # shellcheck disable=SC2016 # single-quoted: expands inside the nested bash -c, not here
     out=$(MYPROMPTS_DURATION_MIN=5 "$BASH32" -c '
         source ./vaporwave_bash_prompt >/dev/null 2>&1
         myprompts_timer=$((SECONDS - 1)); myprompts_build_ps1
@@ -147,18 +163,24 @@ test_duration_segment_below_threshold() {
 test_root_marker() {
     test_start "prompt shows a root marker when EUID is 0"
     local out
+    # shellcheck disable=SC2016 # single-quoted: expands inside the nested bash -c, not here
     out=$("$BASH32" -c '
         source ./vaporwave_bash_prompt >/dev/null 2>&1
-        myprompts_root_segment 0' 2>&1 | strip_ansi)
+        out=""
+        myprompts_root_segment out 0
+        printf %s "$out"' 2>&1 | strip_ansi)
     assert_contains "$out" "#" "root marker"
 }
 
 test_ssh_marker() {
     test_start "prompt shows an ssh marker when SSH_CONNECTION is set"
     local out
+    # shellcheck disable=SC2016 # single-quoted: expands inside the nested bash -c, not here
     out=$(SSH_CONNECTION="1.2.3.4 5 6.7.8.9 22" "$BASH32" -c '
         source ./vaporwave_bash_prompt >/dev/null 2>&1
-        myprompts_ssh_segment' 2>&1 | strip_ansi)
+        out=""
+        myprompts_ssh_segment out
+        printf %s "$out"' 2>&1 | strip_ansi)
     assert_contains "$out" "ssh" "ssh marker"
 }
 
@@ -172,6 +194,117 @@ test_debug_trap_chains() {
     assert_contains "$out" "MARKER=touched" "original DEBUG trap preserved"
 }
 
+# Regression test for a real bug: naive `trap -p` string-trimming turned an
+# empty pre-existing DEBUG trap (the standard idiom for disabling tracing)
+# into "; myprompts_timer_start", which bash rejects with a syntax error
+# before every single command -- making the shell unusable.
+test_debug_trap_empty_previous() {
+    test_start "empty pre-existing DEBUG trap does not corrupt the shell"
+    local err
+    err=$("$BASH32" -c '
+        trap "" DEBUG
+        source ./vaporwave_bash_prompt 2>/dev/null
+        :
+        :' 2>&1 >/dev/null)
+    if [ -n "$err" ]; then
+        test_fail "sourcing with an empty prior DEBUG trap wrote to stderr: $err"
+        return
+    fi
+    local out
+    # shellcheck disable=SC2016 # single-quoted: expands inside the nested bash -c, not here
+    out=$("$BASH32" -c '
+        trap "" DEBUG
+        source ./vaporwave_bash_prompt >/dev/null 2>&1
+        trap -p DEBUG
+        :
+        printf "timer_set=%s" "${myprompts_timer:+yes}"' 2>&1)
+    case "$out" in
+        *myprompts_debug_dispatch*timer_set=yes*) test_pass ;;
+        *) test_fail "expected dispatcher installed and timer running, got: $out" ;;
+    esac
+}
+
+# Regression test for a real bug: naive `trap -p` string-trimming does not
+# understand bash's '\'' escaping for a single quote inside the previous
+# trap body, so the re-quoted `trap` command failed and the pre-existing
+# trap was left in place with myprompts_timer_start never installed.
+test_debug_trap_single_quote_previous() {
+    test_start "pre-existing DEBUG trap containing a single quote still runs, and the timer still installs"
+    local out
+    # shellcheck disable=SC2016 # single-quoted: expands inside the nested bash -c, not here
+    out=$("$BASH32" -c '
+        trap "MARK='"'"'yes'"'"'" DEBUG
+        source ./vaporwave_bash_prompt >/dev/null 2>&1
+        :
+        printf "MARK=%s timer_set=%s" "$MARK" "${myprompts_timer:+yes}"' 2>&1)
+    assert_contains "$out" "MARK=yes" "original single-quote trap body still executed"
+    test_start "  ...and myprompts_timer_start also ran"
+    assert_contains "$out" "timer_set=yes" "timer installed alongside the original trap body"
+}
+
+# Regression test for a real bug: sourcing twice with a pre-existing trap
+# used to recapture the already-installed dispatcher as "the previous trap",
+# so the dispatcher called itself, which called itself, ... an unbounded
+# recursion (and, if it terminated, the user's trap body running more than
+# once per command).
+#
+# NOTE on the expected count: DEBUG fires before EVERY simple command,
+# including the final "after=$COUNT" read itself, so the "before=;:;after="
+# idiom counts two firings (one for ":", one for "after=$COUNT") even with
+# zero sourcing -- that is plain bash trap semantics, not a myprompts defect.
+# The real invariant is that this firing count must not change after sourcing
+# once or twice: an extra recapture-as-previous bug would double it (or hang).
+test_debug_trap_double_source_no_recursion() {
+    test_start "double-sourcing with a pre-existing trap does not recurse or double-run it"
+    local baseline single double
+    # shellcheck disable=SC2016 # single-quoted: expands inside the nested bash -c, not here
+    baseline=$(run_bounded "$BASH32" -c '
+        COUNT=0
+        trap "COUNT=\$((COUNT+1))" DEBUG
+        before=$COUNT
+        :
+        after=$COUNT
+        printf "%s" "$((after - before))"' 2>&1)
+    # shellcheck disable=SC2016 # single-quoted: expands inside the nested bash -c, not here
+    single=$(run_bounded "$BASH32" -c '
+        COUNT=0
+        trap "COUNT=\$((COUNT+1))" DEBUG
+        source ./vaporwave_bash_prompt >/dev/null 2>&1
+        before=$COUNT
+        :
+        after=$COUNT
+        printf "%s" "$((after - before))"' 2>&1)
+    # shellcheck disable=SC2016 # single-quoted: expands inside the nested bash -c, not here
+    double=$(run_bounded "$BASH32" -c '
+        COUNT=0
+        trap "COUNT=\$((COUNT+1))" DEBUG
+        source ./vaporwave_bash_prompt >/dev/null 2>&1
+        source ./vaporwave_bash_prompt >/dev/null 2>&1
+        before=$COUNT
+        :
+        after=$COUNT
+        printf "%s" "$((after - before))"' 2>&1)
+    if [ -z "$baseline" ] || [ "$baseline" -le 0 ] 2>/dev/null; then
+        test_fail "assertion error: baseline firing count was not a positive number ('$baseline')"
+    elif [ "$single" = "$baseline" ] && [ "$double" = "$baseline" ]; then
+        test_pass
+    else
+        test_fail "trap firing count changed after sourcing (indicates double-run or recursion): baseline=$baseline single-source=$single double-source=$double"
+    fi
+}
+
+# Structural regression guard for the fork constraint: myprompts_build_ps1
+# must fork exactly once per draw (the sanctioned mp_git_segment/git status
+# call). Any other "$(" appearing in the function body would reintroduce a
+# gratuitous subprocess.
+test_build_ps1_single_command_substitution() {
+    test_start "myprompts_build_ps1 contains exactly one command substitution"
+    local count
+    # shellcheck disable=SC2016 # single-quoted grep pattern is a literal '$(', not an expansion
+    count=$(awk '/^myprompts_build_ps1\(\)/,/^}/' vaporwave_bash_prompt | grep -c '\$(')
+    assert_eq "1" "$count" "command substitution count in myprompts_build_ps1"
+}
+
 test_exit_status_segment
 test_no_exit_status_on_success
 test_duration_segment_above_threshold
@@ -179,5 +312,9 @@ test_duration_segment_below_threshold
 test_root_marker
 test_ssh_marker
 test_debug_trap_chains
+test_debug_trap_empty_previous
+test_debug_trap_single_quote_previous
+test_debug_trap_double_source_no_recursion
+test_build_ps1_single_command_substitution
 
 test_summary

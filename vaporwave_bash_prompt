@@ -51,26 +51,33 @@ MP_C_BOLD=$(mp_b)
 myprompts_style="${MYPROMPTS_PROMPT_STYLE:-compact}"
 myprompts_style=$(printf '%s' "$myprompts_style" | tr '[:upper:]' '[:lower:]')
 
+# Writes into the caller-named variable ($1) instead of stdout so the caller
+# can assemble "pre" with no command substitution (no subprocess fork).
 myprompts_ssh_segment() {
+    local outvar=$1
     if [ -n "${SSH_CONNECTION:-}" ] || [ -n "${SSH_TTY:-}" ]; then
-        printf '%sssh%s ' "$MP_C_INFO" "$MP_C_RESET"
+        printf -v "$outvar" '%sssh%s ' "$MP_C_INFO" "$MP_C_RESET"
     fi
 }
 
-# Takes an optional euid argument so it is testable without being root.
+# Takes an optional euid as the second argument so it is testable without
+# being root. Writes into the caller-named variable ($1); see above.
 myprompts_root_segment() {
-    local euid=${1:-$EUID}
+    local outvar=$1
+    local euid=${2:-$EUID}
     if [ "$euid" -eq 0 ]; then
-        printf '%s%s#%s ' "$MP_C_ERR" "$MP_C_BOLD" "$MP_C_RESET"
+        printf -v "$outvar" '%s%s#%s ' "$MP_C_ERR" "$MP_C_BOLD" "$MP_C_RESET"
     fi
 }
 
 # `jobs %%` is a builtin returning 0 iff a job exists. No subprocess.
 # \j is passed as an argument, not in the format string: printf's handling of
 # unknown backslash escapes in a format is undefined. PS1 expands it later.
+# Writes into the caller-named variable ($1); see above.
 myprompts_jobs_segment() {
+    local outvar=$1
     if jobs %% >/dev/null 2>&1; then
-        printf '%s⚙%s%s ' "$MP_C_MUTED" '\j' "$MP_C_RESET"
+        printf -v "$outvar" '%s⚙%s%s ' "$MP_C_MUTED" '\j' "$MP_C_RESET"
     fi
 }
 
@@ -85,7 +92,7 @@ myprompts_build_ps1() {
 
     local elapsed=0
     if [ -n "${myprompts_timer:-}" ]; then
-        elapsed=$((SECONDS - myprompts_timer))
+        ((elapsed = SECONDS - myprompts_timer))
     fi
     unset myprompts_timer
 
@@ -105,8 +112,15 @@ myprompts_build_ps1() {
         git_seg="${MP_C_ACCENT3}${git_seg}${MP_C_RESET} "
     fi
 
+    local root_seg=""
+    myprompts_root_segment root_seg
+    local ssh_seg=""
+    myprompts_ssh_segment ssh_seg
+    local jobs_seg=""
+    myprompts_jobs_segment jobs_seg
+
     local pre
-    pre="$(myprompts_root_segment)$(myprompts_ssh_segment)${status_seg}${dur_seg}$(myprompts_jobs_segment)"
+    pre="${root_seg}${ssh_seg}${status_seg}${dur_seg}${jobs_seg}"
 
     if [ "$myprompts_style" = "extended" ]; then
         PS1="${pre}${MP_C_ACCENT1}\u${MP_C_INFO}@${MP_C_ACCENT2}\h${MP_C_RESET} "
@@ -120,20 +134,50 @@ myprompts_build_ps1() {
 }
 
 # Chain onto any pre-existing DEBUG trap instead of clobbering it.
-myprompts_existing_debug=$(trap -p DEBUG)
-if [ -n "$myprompts_existing_debug" ]; then
-    myprompts_existing_debug=${myprompts_existing_debug#trap -- \'}
-    myprompts_existing_debug=${myprompts_existing_debug%\' DEBUG}
-    # Double-quoted deliberately: we need the prior trap command's text
-    # substituted now, at trap-install time, to bake it into the new handler.
-    # Single-quoting (the usual trap advice) would instead defer expansion of
-    # myprompts_existing_debug to signal time, when it is no longer set.
-    # shellcheck disable=SC2064
-    trap "${myprompts_existing_debug}; myprompts_timer_start" DEBUG
-else
-    trap 'myprompts_timer_start' DEBUG
-fi
-unset myprompts_existing_debug
+#
+# `trap -p DEBUG` prints a valid shell command (`trap -- 'BODY' DEBUG`), so
+# the previous body must never be recovered by string-trimming that output:
+# an empty body (the common `trap '' DEBUG` idiom for disabling tracing)
+# leaves a bare "; myprompts_timer_start", which bash rejects as a syntax
+# error before every command; a body containing a single quote defeats the
+# strip entirely, silently leaving the old trap in place with our timer
+# never installed. Instead, shadow the `trap` builtin with a function and let
+# bash's own parser hand us the body as $2.
+#
+# Deliberately NOT reset to empty on every source: re-sourcing must not
+# forget a body captured on the first source (see the dispatch-already
+# installed case below).
+myprompts_prev_debug_cmd=${myprompts_prev_debug_cmd:-}
+
+myprompts_capture_debug_trap() {
+    local spec
+    spec=$(trap -p DEBUG)
+    [ -n "$spec" ] || return 0
+    case "$spec" in
+        *myprompts_debug_dispatch*)
+            # Our dispatcher is already installed (idempotent re-source).
+            # Leave myprompts_prev_debug_cmd untouched -- recapturing here
+            # would set it to "myprompts_debug_dispatch" itself, and the
+            # dispatcher would recurse into itself forever.
+            return 0
+            ;;
+    esac
+    # shellcheck disable=SC2329  # invoked indirectly, via the eval below
+    trap() { myprompts_prev_debug_cmd=$2; }
+    eval "$spec" || true
+    unset -f trap
+}
+myprompts_capture_debug_trap
+unset -f myprompts_capture_debug_trap
+
+myprompts_debug_dispatch() {
+    if [ -n "${myprompts_prev_debug_cmd:-}" ]; then
+        eval "$myprompts_prev_debug_cmd"
+    fi
+    myprompts_timer_start
+}
+
+trap myprompts_debug_dispatch DEBUG
 
 case ";${PROMPT_COMMAND:-};" in
     *";myprompts_build_ps1;"*) ;;

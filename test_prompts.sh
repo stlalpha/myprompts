@@ -91,4 +91,93 @@ test_no_bash4_only_syntax
 test_bash_prompt_sources_silently_under_bash32
 test_bash_prompt_sets_ps1
 test_bash_prompt_style_is_case_insensitive
+
+export MYPROMPTS_THEME=signalmine
+export MYPROMPTS_PROMPT_STYLE=compact
+
+# Strip SGR sequences so assertions match on visible text only.
+strip_ansi() { sed 's/\x1b\[[0-9;]*m//g'; }
+
+test_exit_status_segment() {
+    test_start "prompt shows the exit code of a failing command"
+    local out
+    out=$("$BASH32" -c '
+        source ./vaporwave_bash_prompt >/dev/null 2>&1
+        (exit 42); myprompts_build_ps1
+        printf %s "$PS1"' 2>&1 | strip_ansi)
+    assert_contains "$out" "42" "exit code 42 in PS1"
+}
+
+test_no_exit_status_on_success() {
+    test_start "prompt omits the exit code after a successful command"
+    local out
+    out=$("$BASH32" -c '
+        source ./vaporwave_bash_prompt >/dev/null 2>&1
+        true; myprompts_build_ps1
+        printf %s "$PS1"' 2>&1 | strip_ansi)
+    case "$out" in
+        *✗*) test_fail "failure marker present after success: $out" ;;
+        *) test_pass ;;
+    esac
+}
+
+test_duration_segment_above_threshold() {
+    test_start "prompt shows duration above MYPROMPTS_DURATION_MIN"
+    local out
+    out=$(MYPROMPTS_DURATION_MIN=5 "$BASH32" -c '
+        source ./vaporwave_bash_prompt >/dev/null 2>&1
+        myprompts_timer=$((SECONDS - 9)); myprompts_build_ps1
+        printf %s "$PS1"' 2>&1 | strip_ansi)
+    assert_contains "$out" "9s" "9s duration in PS1"
+}
+
+test_duration_segment_below_threshold() {
+    test_start "prompt omits duration below MYPROMPTS_DURATION_MIN"
+    local out
+    out=$(MYPROMPTS_DURATION_MIN=5 "$BASH32" -c '
+        source ./vaporwave_bash_prompt >/dev/null 2>&1
+        myprompts_timer=$((SECONDS - 1)); myprompts_build_ps1
+        printf %s "$PS1"' 2>&1 | strip_ansi)
+    case "$out" in
+        *1s*) test_fail "duration shown below threshold: $out" ;;
+        *) test_pass ;;
+    esac
+}
+
+test_root_marker() {
+    test_start "prompt shows a root marker when EUID is 0"
+    local out
+    out=$("$BASH32" -c '
+        source ./vaporwave_bash_prompt >/dev/null 2>&1
+        myprompts_root_segment 0' 2>&1 | strip_ansi)
+    assert_contains "$out" "#" "root marker"
+}
+
+test_ssh_marker() {
+    test_start "prompt shows an ssh marker when SSH_CONNECTION is set"
+    local out
+    out=$(SSH_CONNECTION="1.2.3.4 5 6.7.8.9 22" "$BASH32" -c '
+        source ./vaporwave_bash_prompt >/dev/null 2>&1
+        myprompts_ssh_segment' 2>&1 | strip_ansi)
+    assert_contains "$out" "ssh" "ssh marker"
+}
+
+test_debug_trap_chains() {
+    test_start "DEBUG trap chains rather than clobbering a pre-existing trap"
+    local out
+    out=$("$BASH32" -c '
+        trap "MARKER=touched" DEBUG
+        source ./vaporwave_bash_prompt >/dev/null 2>&1
+        trap -p DEBUG' 2>&1)
+    assert_contains "$out" "MARKER=touched" "original DEBUG trap preserved"
+}
+
+test_exit_status_segment
+test_no_exit_status_on_success
+test_duration_segment_above_threshold
+test_duration_segment_below_threshold
+test_root_marker
+test_ssh_marker
+test_debug_trap_chains
+
 test_summary

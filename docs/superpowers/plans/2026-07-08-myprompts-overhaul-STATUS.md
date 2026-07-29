@@ -48,6 +48,12 @@ output to stderr (or suppress it in the filtering path) before wiring up CI.
    jobs. One subprocess per draw (the sanctioned `git status`).
 7. **Zsh prompt rewrite.** Mirrors it, using `%F{}` and `%(1j.…)` — zero forks.
 
+**Post-plan addition (commit `f7e42e9`):** `themes/ember.sh` — a third
+selectable palette (ember-orange on steel, molten-red failure marker), modelled
+after send.themcbros.com, palette extracted from the live site. Selected with
+`MYPROMPTS_THEME=ember`. Covered by `test_themes.sh`; renders in truecolor and
+256-color; both prompts pick it up.
+
 ## Corrections made to the plan and spec during implementation
 
 Three of the plan's own prescriptions were wrong and were fixed in place. They
@@ -107,6 +113,9 @@ installable via Homebrew. Neither is a bug. Do not "fix" them.
 - **Task 12** — split `install.sh` into `lib/` modules behind a
   bootstrap-then-exec. No behaviour change. Its `curl | bash` verification
   needs a pushed branch and network; that step is a hard merge gate.
+- **Task 12b** (added post-plan) — Homebrew on Linux, folded into the Task 12
+  refactor. Opt-in, bootstrap-installs brew if missing, and when active fully
+  replaces apt/dnf/pacman on Linux. Full spec is in the plan file after Task 12.
 
 ## To resume
 

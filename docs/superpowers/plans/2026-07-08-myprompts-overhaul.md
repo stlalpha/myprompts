@@ -14,7 +14,9 @@
 - **`curl | bash` must keep working.** No build step, no generated artifact committed to git.
 - Every script must pass `shellcheck` and must source cleanly under `set -u`.
 - Prompt segments must add **zero subprocesses** except the single `git status` call.
-- Default theme is `signalmine`. `vaporwave` remains available.
+- Default theme is `signalmine`. `vaporwave` and `ember` remain available.
+  (`themes/ember.sh` was added post-plan, commit `f7e42e9` — ember-orange on
+  steel, modelled after send.themcbros.com.)
 - No `LICENSE` file. The `## License` section is removed from `README.md`, not filled in.
 - `proxmox-jobs.sqlite3` and `pyghidra_mcp_projects/` are **gitignored, never deleted.**
 - Prompt filenames (`vaporwave_bash_prompt`, `vaporwave_zsh_prompt`) are **not renamed** — renaming would break the `source` lines already written into users' rc files.
@@ -1140,7 +1142,7 @@ Expected: only `README.md` and `CLAUDE.md` hits remain at this point.
 - Delete `vaporwave_liquid_prompt` from the "File Structure" tree, and add
   `themes/`, `lib/prompt_common.sh`, and `uninstall.sh`.
 - Delete `PROMPT_VARIANT` from the "Environment Variables" list; add:
-  - `MYPROMPTS_THEME` — `signalmine` (default) or `vaporwave`
+  - `MYPROMPTS_THEME` — `signalmine` (default), `vaporwave`, or `ember`
   - `MYPROMPTS_GIT` — set to `0` to disable the git segment
   - `MYPROMPTS_DURATION_MIN` — seconds before a command duration is shown (default `5`)
 - **Delete the entire `## License` section.** Do not replace it.
@@ -1793,10 +1795,70 @@ per-file BASE_URL download machinery, which is deleted. No behavior change."
 
 ---
 
+## Task 12b: Homebrew on Linux (fold into the Task 12 refactor)
+
+Added post-plan. Do this while `lib/packages.sh` and `lib/os.sh` are being
+carved out in Task 12, so the logic lands in the module rather than the monolith.
+
+**Decision (from the user):** brew on Linux is **opt-in**, is **bootstrap-installed
+if the user opts in and it is missing**, and when active **fully replaces** the
+native package manager on Linux — apt/dnf/pacman are skipped entirely and every
+package is installed through brew.
+
+**Files:**
+- Modify: `lib/os.sh` — `ensure_homebrew_in_path` and package-manager selection
+- Modify: `lib/packages.sh` — `ensure_homebrew`, `handle_package_bootstrap`
+- Modify: `config/packages.sh` — a shared brew formulae list usable on both OSes
+- Test: extend `test_installer.sh`
+
+**Behavioral requirements:**
+
+1. **Opt-in.** A Linux user selects brew via a prompt (interactive) or
+   `MYPROMPTS_LINUX_BREW=1` (non-interactive). Absent the opt-in, Linux behaves
+   exactly as today (native package manager). Default is native.
+
+2. **Bootstrap if missing.** When the user opts in and `brew` is not found, run
+   the same official installer the macOS path already uses
+   (`ensure_homebrew`) — the Homebrew install script installs to
+   `/home/linuxbrew/.linuxbrew` on Linux. Do **not** run it as root; Homebrew
+   refuses root and the playbook already guards against it. Mirror the macOS
+   consent/prompt flow.
+
+3. **PATH resolution.** `ensure_homebrew_in_path` currently checks only
+   `/opt/homebrew/bin/brew` and `/usr/local/bin/brew` (both macOS). Add the
+   Linux location: `/home/linuxbrew/.linuxbrew/bin/brew` and
+   `"$HOME/.linuxbrew/bin/brew"`, running `eval "$(<path> shellenv)"` for
+   whichever exists.
+
+4. **Replace native.** When brew is active on Linux, `handle_package_bootstrap`
+   installs the shared brew formulae list via `install_brew_formulae` and does
+   **not** call `detect_linux_package_manager` / the apt/dnf/pacman install path
+   at all. `install_brew_casks` and the App Store path stay macOS-only.
+
+5. **Shared list.** The brew formulae installed on Linux are the same
+   `macos_brew_formulae` list (consider renaming to `brew_formulae` with a
+   backward-compatible alias, or documenting that the macOS list is the shared
+   brew list). Do not silently install the *native* lists via brew — package
+   names differ (e.g. `netcat` vs `gnu-netcat`).
+
+**Verification:**
+- On a Linux box with `MYPROMPTS_LINUX_BREW=1` and brew absent: the installer
+  bootstraps brew, adds it to PATH, and installs the brew formulae; apt/dnf/pacman
+  are never invoked (assert via a stubbed package manager that records calls).
+- With the opt-in unset: apt/dnf/pacman still run, brew is never installed —
+  a regression guard proving the default is unchanged.
+- macOS behavior is completely unaffected.
+
+**Out of scope for 12b:** migrating the existing native package lists to brew
+names; brew casks on Linux (Linuxbrew has no cask support).
+
+---
+
 ## Out of Scope
 
 - Ahead/behind git indicators — needs a second git call and goes stale without a fetch.
 - A truly animated prompt via background redraw — fights readline.
 - `neofetch` → `fastfetch` migration — recommended, but a separate change.
-- Linux package-list changes — could not be verified from the development machine.
+- Migrating the native Linux package lists to brew formula names — out of scope
+  for Task 12b, which only adds the brew-replaces-native path, not a list rewrite.
 - Renaming `vaporwave_*_prompt` files — would break `source` lines already in users' rc files.

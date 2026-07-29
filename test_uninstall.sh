@@ -21,7 +21,7 @@ test_uninstall_restores_rc_files_byte_identical() {
     bash_before=$(cksum < "$T/.bashrc")
     zsh_before=$(cksum < "$T/.zshrc")
 
-    ( cd "$repo" && HOME="$T" INSTALL_ROOT="$T/ir" BASE_URL="file://$repo" \
+    ( cd "$repo" && HOME="$T" INSTALL_ROOT="$T/ir" \
         MYPROMPTS_NONINTERACTIVE=1 PROMPT_STYLE=compact SHELL=/bin/bash \
         bash ./install.sh >/dev/null 2>&1 ) || true
 
@@ -64,7 +64,7 @@ test_uninstall_preserves_trailing_blank_line_byte_identical() {
     bash_before=$(cksum < "$T/.bashrc")
     zsh_before=$(cksum < "$T/.zshrc")
 
-    ( cd "$repo" && HOME="$T" INSTALL_ROOT="$T/ir" BASE_URL="file://$repo" \
+    ( cd "$repo" && HOME="$T" INSTALL_ROOT="$T/ir" \
         MYPROMPTS_NONINTERACTIVE=1 PROMPT_STYLE=compact SHELL=/bin/bash \
         bash ./install.sh >/dev/null 2>&1 ) || true
 
@@ -163,7 +163,7 @@ test_uninstall_removes_install_root() {
     test_start "uninstall removes INSTALL_ROOT"
     local T; T=$(mktemp -d)
     local repo="$PWD"
-    ( cd "$repo" && HOME="$T" INSTALL_ROOT="$T/ir" BASE_URL="file://$repo" \
+    ( cd "$repo" && HOME="$T" INSTALL_ROOT="$T/ir" \
         MYPROMPTS_NONINTERACTIVE=1 PROMPT_STYLE=compact SHELL=/bin/bash \
         bash ./install.sh >/dev/null 2>&1 ) || true
     ( cd "$repo" && HOME="$T" INSTALL_ROOT="$T/ir" MYPROMPTS_NONINTERACTIVE=1 \
@@ -178,7 +178,7 @@ test_uninstall_restores_neofetch_backup() {
     local repo="$PWD"
     mkdir -p "$T/.config/neofetch"
     printf 'ORIGINAL\n' > "$T/.config/neofetch/config.conf"
-    ( cd "$repo" && HOME="$T" INSTALL_ROOT="$T/ir" BASE_URL="file://$repo" \
+    ( cd "$repo" && HOME="$T" INSTALL_ROOT="$T/ir" \
         MYPROMPTS_NONINTERACTIVE=1 PROMPT_STYLE=compact SHELL=/bin/bash \
         bash ./install.sh >/dev/null 2>&1 ) || true
     ( cd "$repo" && HOME="$T" INSTALL_ROOT="$T/ir" MYPROMPTS_NONINTERACTIVE=1 \

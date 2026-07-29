@@ -32,7 +32,7 @@ fi
 
 # Test 3: Check installer has App Store support
 echo -n "Test 3: Check installer has install_appstore_apps function... "
-if grep -q "install_appstore_apps()" install.sh; then
+if grep -q "install_appstore_apps()" install.sh lib/*.sh; then
     echo -e "${GREEN}✓${NC}"
 else
     echo -e "${RED}✗${NC}"
@@ -50,7 +50,7 @@ fi
 
 # Test 5: Check filter_missing_packages supports appstore
 echo -n "Test 5: Check filter_missing_packages supports appstore... "
-if grep -q "appstore)" install.sh; then
+if grep -q "appstore)" install.sh lib/*.sh; then
     echo -e "${GREEN}✓${NC}"
 else
     echo -e "${RED}✗${NC}"
@@ -66,7 +66,6 @@ echo -e "${YELLOW}Note: This is a non-destructive test using a temporary directo
 TEST_DIR=$(mktemp -d)
 export HOME="$TEST_DIR"
 export INSTALL_ROOT="$TEST_DIR/.myprompts"
-export BASE_URL="file://$PWD"
 export MYPROMPTS_NONINTERACTIVE=1
 export PROMPT_VARIANT=bash
 export PROMPT_STYLE=compact

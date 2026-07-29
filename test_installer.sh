@@ -39,10 +39,7 @@ setup_test_env() {
     TEST_DIR=$(mktemp -d)
     export HOME="$TEST_DIR"
     export INSTALL_ROOT="$TEST_DIR/.local/share/myprompts"
-    export BASE_URL="file://$PWD"
     export MYPROMPTS_NONINTERACTIVE=1
-    export CONFIG_TMP_DIR="$TEST_DIR/config"
-    mkdir -p "$CONFIG_TMP_DIR"
 }
 
 cleanup_test_env() {
@@ -188,7 +185,6 @@ test_installer_noninteractive() {
 
     # Run installer in non-interactive mode
     if HOME="$TEST_DIR" \
-       BASE_URL="file://$PWD" \
        INSTALL_ROOT="$TEST_DIR/.myprompts" \
        MYPROMPTS_NONINTERACTIVE=1 \
        PROMPT_VARIANT=bash \
@@ -209,14 +205,12 @@ test_reinstall_flow() {
 
     # First install
     HOME="$TEST_DIR" \
-    BASE_URL="file://$PWD" \
     INSTALL_ROOT="$TEST_DIR/.myprompts" \
     MYPROMPTS_NONINTERACTIVE=1 \
     bash ./install.sh >/dev/null 2>&1
 
     # Reinstall should fail in non-interactive mode
     if HOME="$TEST_DIR" \
-       BASE_URL="file://$PWD" \
        INSTALL_ROOT="$TEST_DIR/.myprompts" \
        MYPROMPTS_NONINTERACTIVE=1 \
        bash ./install.sh >/dev/null 2>&1; then
@@ -253,10 +247,12 @@ test_shellcheck() {
     test_start "shellcheck validation"
 
     if command -v shellcheck >/dev/null 2>&1; then
-        if shellcheck -S error install.sh >/dev/null 2>&1; then
+        # install.sh sources lib/*.sh via a runtime-computed path; shellcheck
+        # only resolves those cross-file globals when both are passed together.
+        if shellcheck install.sh lib/*.sh >/dev/null 2>&1; then
             test_pass
         else
-            test_fail "Shellcheck found errors"
+            test_fail "Shellcheck found warnings at default severity"
         fi
     else
         echo -e "${YELLOW}SKIP${NC} (shellcheck not installed)"

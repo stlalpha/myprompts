@@ -68,9 +68,14 @@ test_empty_array_handling() {
             done
         fi
 
-        # Test parameter expansion for empty arrays
+        # Test parameter expansion for empty arrays. The scalar assignment is
+        # intentional: this mirrors the empty-array expansion install.sh performs
+        # under set -u, and the test only proves it does not throw an unbound
+        # error — the joined value itself is never used.
         local result
+        # shellcheck disable=SC2124  # scalar-from-array join is the pattern under test
         result=${empty_array[@]+"${empty_array[@]}"}
+        : "$result"
 
         test_pass
     ) 2>/dev/null || test_fail "Empty array caused unbound variable error"
@@ -82,6 +87,7 @@ test_filter_missing_packages_empty() {
     setup_test_env
 
     # Source the function
+    # shellcheck disable=SC1091  # install.sh is present at runtime; shellcheck cannot follow it without -x
     source ./install.sh 2>/dev/null || true
 
     # Mock brew command to say everything is installed
@@ -92,10 +98,13 @@ test_filter_missing_packages_empty() {
     }
     export -f brew
 
-    # Test with packages that are all "installed"
+    # Test with packages that are all "installed". Capture stdout only: the
+    # function's return value is the list of packages still to install (empty
+    # here), while its "already installed; skipping" notices go to stderr by
+    # design. Folding stderr in with 2>&1 would defeat that and never be empty.
     local result
-    result=$(filter_missing_packages brew_formulae gh nmap netcat 2>&1) || {
-        test_fail "Function failed: $result"
+    result=$(filter_missing_packages brew_formulae gh nmap netcat) || {
+        test_fail "Function failed"
         cleanup_test_env
         return
     }
@@ -124,8 +133,12 @@ test_ansible_args_empty() {
             ansible_args+=(-b)
         fi
 
-        # This should not fail with empty array
+        # This should not fail with empty array. As above, the scalar join is
+        # the pattern under test; the built string is only checked for not
+        # throwing under set -u.
+        # shellcheck disable=SC2124  # scalar-from-array join is the pattern under test
         local cmd="ansible-playbook test.yml ${ansible_args[@]+"${ansible_args[@]}"}"
+        : "$cmd"
 
         test_pass
     ) 2>/dev/null || test_fail "Empty ansible_args caused error"

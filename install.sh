@@ -1232,8 +1232,14 @@ main() {
   local neofetch_style=""
   choose_neofetch_style neofetch_style
   info "Using $neofetch_style for neofetch"
-  cp "$INSTALL_ROOT/neofetch/$neofetch_style" "$HOME/.config/neofetch/config.conf"
-  chmod 644 "$HOME/.config/neofetch/config.conf"
+  local neofetch_target="$HOME/.config/neofetch/config.conf"
+  local neofetch_backup="$neofetch_target.myprompts-backup"
+  if [[ -f $neofetch_target && ! -f $neofetch_backup ]]; then
+    info "Backing up existing neofetch config to ${neofetch_backup/#$HOME/~}"
+    mv "$neofetch_target" "$neofetch_backup"
+  fi
+  cp "$INSTALL_ROOT/neofetch/$neofetch_style" "$neofetch_target"
+  chmod 644 "$neofetch_target"
 
   printf 'installed %s\n' "$(date -u +%FT%TZ)" >"$INSTALL_ROOT/.install-meta"
 

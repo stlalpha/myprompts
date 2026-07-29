@@ -229,6 +229,26 @@ test_reinstall_flow() {
     cleanup_test_env
 }
 
+test_neofetch_config_backed_up() {
+    test_start "install backs up a pre-existing neofetch config"
+    setup_test_env
+    mkdir -p "$HOME/.config/neofetch"
+    printf 'ORIGINAL\n' >"$HOME/.config/neofetch/config.conf"
+
+    # setup_test_env exports MYPROMPTS_NONINTERACTIVE=1, and
+    # handle_package_bootstrap returns early when INTERACTIVE is 0. So this
+    # installs no packages. Do not add a skip flag; one is not needed.
+    PROMPT_STYLE=compact bash ./install.sh >/dev/null 2>&1 || true
+
+    local backup="$HOME/.config/neofetch/config.conf.myprompts-backup"
+    if [[ -f $backup ]] && [[ "$(cat "$backup")" == "ORIGINAL" ]]; then
+        test_pass
+    else
+        test_fail "backup missing or wrong contents"
+    fi
+    cleanup_test_env
+}
+
 test_shellcheck() {
     test_start "shellcheck validation"
 
@@ -257,6 +277,7 @@ main() {
     test_bash_compatibility
     test_installer_noninteractive
     test_reinstall_flow
+    test_neofetch_config_backed_up
     test_shellcheck
 
     echo

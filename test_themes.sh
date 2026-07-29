@@ -68,6 +68,7 @@ test_theme_fallback() {
 
 test_theme_defines_all_roles signalmine
 test_theme_defines_all_roles vaporwave
+test_theme_defines_all_roles ember
 test_role_format
 test_mp_fg_256
 test_mp_fg_truecolor

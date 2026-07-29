@@ -102,7 +102,7 @@ bash test_appstore.sh     # App Store integration tests
 ### Portability Requirements
 - Test on both macOS and Linux
 - Verify 256-color support gracefully degrades
-- Animated prompts require Unicode support
+- Prompts require a UTF-8 locale for their box-drawing and arrow glyphs
 - Zsh prompts require `setopt prompt_subst`
 
 ## Package Configuration
@@ -141,7 +141,7 @@ linux_paru_packages=(gnu-netcat YOUR_AUR_PACKAGE)
 
 ## Git Workflow
 
-- Follow Conventional Commits (e.g., `feat: add liquid prompt throttle`, `fix: handle missing git binary`)
+- Follow Conventional Commits (e.g., `feat: add prompt duration threshold`, `fix: handle missing git binary`)
 - Include terminal screenshots for visual changes
 - Document manual testing steps in PR descriptions
 - Note shell versions and terminal emulators tested

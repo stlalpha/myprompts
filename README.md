@@ -5,7 +5,7 @@ Vaporwave-themed shell prompts with automated system configuration.
 ## Features
 
 - Shell prompt themes for Bash and Zsh
-- Animated and static prompt variants
+- Static prompt variants for Bash and Zsh
 - Custom LS colors matching the vaporwave aesthetic
 - Automated package installation via Ansible
 - Mac App Store app installation support (macOS)

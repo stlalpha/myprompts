@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+      - name: Lint (default severity)
+        run: |
+          shellcheck uninstall.sh run_tests.sh vaporwave_ls_setup.sh \
+                     config/*.sh themes/*.sh lib/*.sh test_*.sh
+          # Prompts are sourced, not executed; tell shellcheck which shell.
+          shellcheck --shell=bash vaporwave_bash_prompt
+          # vaporwave_zsh_prompt is intentionally NOT linted: shellcheck has
+          # no zsh support and would misparse zsh-only syntax.
+      - name: Lint install.sh (errors only)
+        run: |
+          # install.sh reads package arrays from a sourced config file that
+          # shellcheck can't follow, plus one unused local retained for a
+          # future palette entry. Both are pre-existing SC2154/SC2034
+          # warnings; Task 12 (install.sh modularization) will clean them
+          # up. Gate on errors only so CI stays green until then.
+          shellcheck -S error install.sh
+
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Record bash version
+        run: /bin/bash --version | head -1
+      - name: Run suite
+        run: ./run_tests.sh

@@ -7,7 +7,6 @@ set -euo pipefail
 BASE_URL=${BASE_URL:-"https://raw.githubusercontent.com/stlalpha/myprompts/main"}
 INSTALL_ROOT=${INSTALL_ROOT:-"$HOME/.local/share/myprompts"}
 PROMPT_STATIC=vaporwave_bash_prompt
-PROMPT_LIQUID=vaporwave_liquid_prompt
 PROMPT_ZSH=vaporwave_zsh_prompt
 LS_COLORS_FILE=vaporwave_lscolors
 
@@ -1007,69 +1006,6 @@ prompt_yes_no() {
   done
 }
 
-choose_prompt_variant() {
-  local __out_var=$1
-  local preset=""
-  local selection=""
-
-  if (( ! INTERACTIVE )); then
-    preset=${PROMPT_VARIANT:-}
-    preset=$(echo "$preset" | tr '[:upper:]' '[:lower:]')
-    case "$preset" in
-      liquid|animated)
-        selection="$PROMPT_LIQUID"
-        ;;
-      classic|static|vaporwave|"")
-        selection="$PROMPT_STATIC"
-        ;;
-      *) error "Unknown PROMPT_VARIANT '$preset'; expected 'classic' or 'liquid'."; exit 1 ;;
-    esac
-    printf -v "$__out_var" '%s' "$selection"
-    return
-  fi
-
-  local reset=$'\033[0m'
-  local bold=$'\033[1m'
-  local pink=$'\033[38;5;198m'
-  local cyan=$'\033[38;5;51m'
-  local purple=$'\033[38;5;141m'
-  local dark_purple=$'\033[38;5;93m'
-  local blue=$'\033[38;5;39m'
-  local orange=$'\033[38;5;209m'
-  local green=$'\033[38;5;85m'
-  local magenta=$'\033[38;5;201m'
-  local wave=$'\033[38;5;123m'
-  local bg_dark=$'\033[48;5;234m'
-
-  printf '\nPrompt variant options:\n' >&"$PROMPT_FD"
-  printf '  [1] Classic – static vaporwave prompt\n' >&"$PROMPT_FD"
-  printf '      %s%s◤%suser%s@%shost%s◢%s %s【%s~/project%s】%s %s『main』%s %s%s▸%s\n' \
-    "$bg_dark" "$pink" "$cyan" "$dark_purple" "$purple" "$pink" "$reset" "$orange" "$green" "$orange" "$reset" "$magenta" "$reset" "$blue" "$bold" "$reset" >&"$PROMPT_FD"
-  printf '  [2] Liquid – animated waveform prompt\n' >&"$PROMPT_FD"
-  printf '      %s%s◤%suser%s@%shost%s◢%s %s≈≋≈%s %s~/project%s %s≈≋≈%s %s『main』%s %s%s∼▸%s%s\n' \
-    "$bg_dark" "$pink" "$cyan" "$dark_purple" "$purple" "$pink" "$reset" "$wave" "$reset" "$green" "$reset" "$wave" "$reset" "$magenta" "$reset" "$wave" "$bold" "$reset" "$reset" >&"$PROMPT_FD"
-
-  local choice
-  while true; do
-    if ! printf 'Select prompt variant [1-2] (default: 1): ' >&"$PROMPT_FD"; then
-      error "Failed to display prompt variant question."
-      exit 1
-    fi
-    if ! IFS= read -r -u "$PROMPT_FD" choice; then
-      error "Failed to read response; aborting installation."
-      exit 1
-    fi
-    choice=${choice:-1}
-    case "$choice" in
-      1) selection="$PROMPT_STATIC"; break ;;
-      2) selection="$PROMPT_LIQUID"; break ;;
-      *) printf 'Please enter 1 or 2.\n' >&"$PROMPT_FD" ;;
-    esac
-  done
-
-  printf -v "$__out_var" '%s' "$selection"
-}
-
 choose_neofetch_style() {
   local __out_var=$1
   local preset=""
@@ -1281,7 +1217,6 @@ main() {
   mkdir -p "$INSTALL_ROOT"
 
   download_asset "$PROMPT_STATIC"
-  download_asset "$PROMPT_LIQUID"
   download_asset "$PROMPT_ZSH"
   download_asset "$LS_COLORS_FILE"
 
@@ -1318,8 +1253,7 @@ main() {
       choose_prompt_style prompt_style
       info "Using $prompt_style layout for prompts."
     fi
-    local bash_prompt_file=""
-    choose_prompt_variant bash_prompt_file
+    local bash_prompt_file="$PROMPT_STATIC"
     write_prompt_style "$HOME/.bashrc" "$prompt_style"
     append_block "$HOME/.bashrc" "# >>> myprompts prompt >>>" "source \"$INSTALL_ROOT/$bash_prompt_file\""
     configure_bash=1

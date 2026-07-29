@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Vaporwave-themed shell prompt system with automated configuration and package installation. Three prompt variants (static Bash, animated Liquid, Zsh) with matching LS colors, distributed via curl-friendly install script that bootstraps both prompts and packages via Ansible.
+Vaporwave-themed shell prompt system with automated configuration and package installation. Two prompt variants (static Bash, Zsh) with matching LS colors, distributed via curl-friendly install script that bootstraps both prompts and packages via Ansible.
 
 ## Architecture
 
@@ -13,7 +13,6 @@ Vaporwave-themed shell prompt system with automated configuration and package in
 - All prompts honor `MYPROMPTS_PROMPT_STYLE=compact|extended` for layout control
 - Color palettes use 256-color ANSI codes (e.g., `\033[38;5;198m`)
 - Git branch detection is embedded directly in each prompt variant using `git branch 2>/dev/null`
-- Animated prompts use Unicode wave frames (`≈≋≈`, `∼∽∼`, `～〜～`) for liquid effect
 
 ### Installation Flow
 1. `install.sh` detects existing installations and prompts for purge if needed
@@ -26,7 +25,7 @@ Vaporwave-themed shell prompt system with automated configuration and package in
 ### Interactive Mode Handling
 - Installer uses `/dev/tty` (file descriptor 3) for interactive prompts to support `curl | bash` installation
 - This allows script to read from stdin for downloading while prompting user on terminal
-- Non-interactive mode (`MYPROMPTS_NONINTERACTIVE=1`) skips prompts but still installs packages automatically
+- Non-interactive mode (`MYPROMPTS_NONINTERACTIVE=1`) skips prompts and skips package installation
 
 ### Configuration System
 - `config/packages.sh`: Platform-specific package arrays (e.g., `macos_brew_formulae`, `linux_paru_packages`)
@@ -47,7 +46,6 @@ Vaporwave-themed shell prompt system with automated configuration and package in
 Source directly during development:
 ```bash
 source ./vaporwave_bash_prompt
-source ./vaporwave_liquid_prompt
 source ./vaporwave_zsh_prompt
 ```
 
@@ -66,7 +64,7 @@ SHELL=/bin/bash bash ./install.sh
 
 Non-interactive with pre-selected options:
 ```bash
-PROMPT_VARIANT=liquid PROMPT_STYLE=extended MYPROMPTS_NONINTERACTIVE=1 bash ./install.sh
+PROMPT_STYLE=extended MYPROMPTS_NONINTERACTIVE=1 bash ./install.sh
 ```
 
 ### Testing LS Colors
@@ -132,7 +130,6 @@ linux_paru_packages=(gnu-netcat YOUR_AUR_PACKAGE)
 
 - `install.sh`: Main bootstrapper with OS detection, interactive prompts, file download, config parsing, Ansible execution
 - `vaporwave_bash_prompt`: Static Bash prompt with git branch detection and vaporwave palette
-- `vaporwave_liquid_prompt`: Animated Bash prompt with wave effects using Unicode frames and color cycling
 - `vaporwave_zsh_prompt`: Zsh native prompt mirroring Bash layout with Zsh-specific hooks
 - `vaporwave_lscolors`: Exported `LS_COLORS` table for file extension colorization
 - `vaporwave_ls_setup.sh`: Helper to wire LS colors (for manual sourcing, legacy)

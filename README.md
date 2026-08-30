@@ -35,6 +35,14 @@ bash install.sh
   - Fedora/RHEL (dnf)
   - Arch Linux (pacman/paru)
 
+### Homebrew on Linux (opt-in)
+
+Linux installs use the native package manager by default. Set
+`MYPROMPTS_LINUX_BREW=1` (or answer the prompt) to use Homebrew instead — it
+then **fully replaces** apt/dnf/pacman rather than supplementing them, and
+Homebrew is bootstrapped if missing. Casks and Mac App Store apps remain
+macOS-only; Linuxbrew has no cask support. Homebrew will not install as root.
+
 `fastfetch` is not packaged for Debian 12 (bookworm) or older, so the apt
 package step will fail there. Everything else installs normally; drop
 `fastfetch` from `linux_apt_packages` if you are on bookworm.
@@ -172,6 +180,7 @@ trap keeps working and no duration is shown. Upgrading to a current Bash
 - `MYPROMPTS_DURATION_MIN` - Seconds before a command duration is shown (default `5`)
 - `PROMPT_STYLE` - Pre-select style: `compact` or `extended`
 - `FASTFETCH_STYLE` - Pre-select fastfetch layout: `vaporwave` or `boxed`
+- `MYPROMPTS_LINUX_BREW` - Set to `1` to install Linux packages with Homebrew instead of apt/dnf/pacman
 
 ## Testing
 

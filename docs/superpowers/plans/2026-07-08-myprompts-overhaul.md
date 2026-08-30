@@ -1797,6 +1797,13 @@ per-file BASE_URL download machinery, which is deleted. No behavior change."
 
 ## Task 12b: Homebrew on Linux (fold into the Task 12 refactor)
 
+> **DONE (2026-08-30).** Implemented as specified by the architecture
+> correction below: `select_linux_manager` returns `brew` on opt-in,
+> `handle_package_bootstrap` fills only `pending_macos_brew_formulae`, and the
+> playbook's formulae task is gated on
+> `target_os == 'macos' or package_manager == 'brew'`. Covered by
+> `test_linux_brew.sh`.
+
 Added post-plan. Do this while `lib/packages.sh` and `lib/os.sh` are being
 carved out in Task 12, so the logic lands in the module rather than the monolith.
 

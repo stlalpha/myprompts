@@ -8,7 +8,7 @@ cd "$(dirname "$0")" || exit 1
 
 failed=0
 
-for t in test_themes.sh test_prompts.sh test_zsh_prompt.sh test_uninstall.sh test_installer.sh test_appstore.sh; do
+for t in test_themes.sh test_prompts.sh test_zsh_prompt.sh test_uninstall.sh test_installer.sh test_appstore.sh test_linux_brew.sh; do
     if [ ! -f "$t" ]; then
         printf '\n=== %s (skipped: not found) ===\n' "$t"
         continue

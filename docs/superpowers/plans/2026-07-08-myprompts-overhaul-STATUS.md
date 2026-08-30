@@ -1,8 +1,8 @@
 # myprompts overhaul — status
 
 **Status: COMPLETE.** Merged to `main` via PR #2 (merge commit `1f7f5c1`) on
-2026-08-30. Tasks 1-12 all landed. Task 12b (Homebrew on Linux) is the only
-plan item still outstanding.
+2026-08-30. Tasks 1-12 all landed. Task 12b (Homebrew on Linux) landed
+separately on 2026-08-30. No plan items remain outstanding.
 
 **Branch:** `feat/overhaul` (merged and deleted).
 **Plan:** `docs/superpowers/plans/2026-07-08-myprompts-overhaul.md`
@@ -136,7 +136,7 @@ not. Read this section before trusting anything above it.
 
 ## Remaining tasks
 
-All of the below are now DONE except Task 12b.
+All of the below are now DONE.
 
 - **Task 8** (done) — delete `vaporwave_liquid_prompt`, strip `PROMPT_LIQUID` and
   `choose_prompt_variant` from `install.sh`, update `README.md` / `CLAUDE.md`.
@@ -152,7 +152,7 @@ All of the below are now DONE except Task 12b.
 - **Task 12** (done) — split `install.sh` into `lib/` modules behind a
   bootstrap-then-exec. No behaviour change. Its `curl | bash` verification
   needs a pushed branch and network; that step is a hard merge gate.
-- **Task 12b** (OUTSTANDING -- the only one left) — Homebrew on Linux, folded into the Task 12
+- **Task 12b** (done) — Homebrew on Linux, folded into the Task 12
   refactor. Opt-in, bootstrap-installs brew if missing, and when active fully
   replaces apt/dnf/pacman on Linux. Full spec is in the plan file after Task 12.
 

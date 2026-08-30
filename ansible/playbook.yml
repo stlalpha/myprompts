@@ -19,8 +19,11 @@
       changed_when: "'already installed' not in brew_install.stdout"
       loop: "{{ brew_formulae }}"
       become: false
+      # Also runs on Linux when the user opted into Homebrew replacing the
+      # native package manager. Casks and the App Store below stay macOS-only:
+      # Linuxbrew has no cask support.
       when:
-        - target_os == 'macos'
+        - target_os == 'macos' or package_manager == 'brew'
         - brew_formulae | length > 0
 
     - name: Install Homebrew casks

@@ -62,15 +62,61 @@ else
   fi
 fi
 
-# The bootstrap drops this file into the directory it creates. cleanup() will
-# not remove anything that lacks it, so a MYPROMPTS_TMP_SRC inherited from the
-# caller's environment can never cause an unrelated directory to be deleted.
+# The bootstrap writes a freshly generated token into this file inside the
+# directory it creates, and passes the same token to its re-exec'd child.
+# cleanup() removes a directory only when the token inside it matches, so
+# neither an unrelated MYPROMPTS_TMP_SRC inherited from the caller's
+# environment nor a stale directory left by an earlier bootstrap can be
+# deleted. Shape alone is not proof of ownership: a killed bootstrap leaves a
+# directory with the same basename pattern and the same sentinel file.
 MYPROMPTS_TMP_SENTINEL=.myprompts-bootstrap
 
+myprompts_new_tmp_token() {
+  local token=""
+  if [[ -r /dev/urandom ]]; then
+    token=$(od -An -tx1 -N16 /dev/urandom 2>/dev/null | tr -d ' \n')
+  fi
+  # Fallback for a system without a readable /dev/urandom. Weaker, but this
+  # only has to be unguessable enough that a stale directory never matches.
+  [[ -n $token ]] || token="$$-${RANDOM}-${RANDOM}-$(date +%s 2>/dev/null)"
+  printf '%s' "$token"
+}
+
+# Set only by this process, never inherited: reset before the trap is armed so
+# an exported variable of the same name from the caller cannot seed it. This is
+# how the bootstrap parent remembers a directory it created but has not yet
+# exec'd out of -- the case where the fetch fails.
+MYPROMPTS_TMP_CREATED=""
+
+# Ownership for the re-exec'd child. The token alone is not enough: it travels
+# through the environment, so a caller can supply a matching MYPROMPTS_TMP_SRC,
+# MYPROMPTS_TMP_TOKEN and sentinel together and satisfy every check. The proof
+# that cannot be forged from the environment is location -- the script this
+# process is executing must itself live inside the directory being removed.
+# Getting that to hold means actually running install.sh from inside the
+# directory, which is what a real bootstrap child does and what nobody does by
+# accident.
 myprompts_tmp_is_ours() {
   local dir=${1:-}
   [[ -n $dir && -d $dir ]] || return 1
-  [[ -f "$dir/$MYPROMPTS_TMP_SENTINEL" ]] || return 1
+
+  local self=""
+  if [[ -n ${BASH_SOURCE[0]:-} && -f ${BASH_SOURCE[0]} ]]; then
+    self=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd 2>/dev/null) || self=""
+  fi
+  [[ -n $self ]] || return 1
+  local resolved
+  resolved=$(cd "$dir" && pwd 2>/dev/null) || return 1
+  [[ $self == "$resolved" ]] || return 1
+
+  [[ -n ${MYPROMPTS_TMP_TOKEN:-} ]] || return 1
+  local sentinel="$dir/$MYPROMPTS_TMP_SENTINEL"
+  [[ -f $sentinel ]] || return 1
+  local recorded=""
+  IFS= read -r recorded < "$sentinel" 2>/dev/null || return 1
+  [[ $recorded == "$MYPROMPTS_TMP_TOKEN" ]] || return 1
+
+  # Structural guard, kept as a further line of defence.
   case "${dir##*/}" in
     myprompts.??????) return 0 ;;
     *) return 1 ;;
@@ -81,9 +127,12 @@ cleanup() {
   if [[ $TTY_FD_OPENED -eq 1 ]]; then
     exec 3>&-
   fi
-  # Set only when this process was re-exec'd out of a fetched tarball. By the
-  # time the trap runs the install has copied everything it needs out of it.
-  if myprompts_tmp_is_ours "${MYPROMPTS_TMP_SRC:-}"; then
+  # Either this process created the directory and never exec'd out of it (a
+  # failed fetch), or it is the re-exec'd child running from inside it. By the
+  # time the trap runs the install has copied out everything it needs.
+  if [[ -n $MYPROMPTS_TMP_CREATED && -d $MYPROMPTS_TMP_CREATED ]]; then
+    rm -rf "$MYPROMPTS_TMP_CREATED"
+  elif myprompts_tmp_is_ours "${MYPROMPTS_TMP_SRC:-}"; then
     rm -rf "$MYPROMPTS_TMP_SRC"
   fi
 }
@@ -109,7 +158,7 @@ myprompts_bootstrap() {
     # via the adjacent lib/ but whose inherited value is the tree it must
     # clean up. The sentinel tells them apart.
     if ! myprompts_tmp_is_ours "${MYPROMPTS_TMP_SRC:-}"; then
-      unset MYPROMPTS_TMP_SRC
+      unset MYPROMPTS_TMP_SRC MYPROMPTS_TMP_TOKEN
     fi
     return 0
   fi
@@ -121,13 +170,20 @@ myprompts_bootstrap() {
   tmp_base=${TMPDIR:-/tmp}
   tmp_base=${tmp_base%/}
   tmp=$(mktemp -d "$tmp_base/myprompts.XXXXXX")
-  # Mark it as ours before anything else can fail. cleanup() removes only
-  # directories carrying this sentinel, so an inherited MYPROMPTS_TMP_SRC
-  # pointing at unrelated data is never touched.
-  : > "$tmp/$MYPROMPTS_TMP_SENTINEL"
+  # Mark it as ours before anything else can fail: a token this process just
+  # generated, recorded inside the directory and handed to the child. cleanup()
+  # deletes only on an exact match, so neither an unrelated inherited path nor
+  # a stale directory from a previous run can be removed.
+  local token
+  token=$(myprompts_new_tmp_token)
+  printf '%s\n' "$token" > "$tmp/$MYPROMPTS_TMP_SENTINEL"
+  # Remember it in process-local state so a failed fetch is still cleaned up
+  # without relying on anything that came from the environment.
+  MYPROMPTS_TMP_CREATED=$tmp
   # Export before the fetch, not after: if the curl | tar pipeline fails, the
   # EXIT trap still knows what to clean up.
   export MYPROMPTS_TMP_SRC=$tmp
+  export MYPROMPTS_TMP_TOKEN=$token
   echo "Fetching myprompts..."
   # /archive/<ref>.tar.gz resolves a branch, a tag or a commit SHA. The
   # /archive/refs/heads/<ref>.tar.gz form this used to build only resolves

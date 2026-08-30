@@ -246,7 +246,10 @@ main() {
   mkdir -p "$INSTALL_ROOT/fastfetch"
   install -m 644 "$MYPROMPTS_SRC/fastfetch/config-vaporwave.jsonc" "$INSTALL_ROOT/fastfetch/config-vaporwave.jsonc"
   install -m 644 "$MYPROMPTS_SRC/fastfetch/config-boxed.jsonc" "$INSTALL_ROOT/fastfetch/config-boxed.jsonc"
-  install -m 644 "$MYPROMPTS_SRC/fastfetch/signalmine.txt" "$HOME/.config/fastfetch/signalmine.txt"
+  # signalmine.txt is the full-size master; the shipped logo is the 60%
+  # reduction so the panel does not dwarf the info block. Regenerate the
+  # variants with tools/scale_ascii.py.
+  install -m 644 "$MYPROMPTS_SRC/fastfetch/signalmine_60.txt" "$HOME/.config/fastfetch/signalmine.txt"
   local fastfetch_style=""
   choose_fastfetch_style fastfetch_style
   info "Using $fastfetch_style for fastfetch"

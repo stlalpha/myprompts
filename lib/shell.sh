@@ -72,8 +72,11 @@ if prompt_yes_no "Proceed with reinstall?" N; then
 }
 
 # True only when every opening marker is closed by a later terminator, with no
-# stray terminator before one and none left open at EOF. uninstall.sh carries
-# an identical copy: it is deliberately standalone and does not source lib/.
+# stray terminator before one and none left open at EOF. uninstall.sh carries a
+# byte-identical copy: it is the recovery tool and runs `set -euo pipefail`, so
+# sourcing a lib/ that had gone missing would abort the uninstall outright --
+# a worse failure than duplication. test_uninstall.sh asserts the two copies
+# never drift.
 markers_well_formed() {
   local file=$1 start=$2 end=$3 legacy=$4
   awk -v start="$start" -v end="$end" -v legacy="$legacy" '
@@ -81,6 +84,73 @@ markers_well_formed() {
     ($0 == end || $0 == legacy) { if (!open) { exit 1 } open = 0; next }
     END { if (open) exit 1 }
   ' "$file"
+}
+
+# An explicit template so TMPDIR is honoured on macOS too, where a bare
+# `mktemp` uses the Darwin per-user directory regardless. Prints the path.
+stage_file() {
+  local tmp_base=${TMPDIR:-/tmp}
+  tmp_base=${tmp_base%/}
+  mktemp "$tmp_base/myprompts.XXXXXX"
+}
+
+# Overwrite $file with the staged copy. Writes into the existing file (not mv)
+# so its mode, inode and symlink target survive; mktemp's 0600 temp file would
+# otherwise tighten permissions and turn a symlinked rc into a regular file.
+# `cat "$tmp" > "$file"` truncates $file before it can discover the staged copy
+# is unusable, so keep a backup to restore from if the write fails partway.
+# $3 permits a legitimately empty result -- an rc file that was nothing but
+# marker lines repairs to empty, and the guard would otherwise block the only
+# thing that can heal it.
+commit_staged() {
+  local file=$1 tmp=$2 allow_empty=${3:-0}
+  if [[ $allow_empty -eq 0 && ! -s $tmp ]]; then
+    warn "Staged update was empty; leaving ${file/#$HOME/~} unchanged."
+    rm -f "$tmp"
+    return 1
+  fi
+  local backup="$tmp.orig"
+  cp "$file" "$backup" 2>/dev/null || true
+  if ! cat "$tmp" > "$file"; then
+    warn "Write to ${file/#$HOME/~} failed; restoring the original."
+    [[ -f $backup ]] && cat "$backup" > "$file"
+    rm -f "$tmp" "$backup"
+    return 1
+  fi
+  rm -f "$tmp" "$backup"
+}
+
+# Drop marker lines that have no partner, leaving everything else in place.
+# Only the marker LINES go: the extent of an unterminated block is unknowable,
+# so its body stays as ordinary content rather than being guessed at and
+# deleted. Where a second start opens while one is still open, the EARLIER one
+# is dropped -- that keeps the tighter pair, and dropping the later start
+# instead would sweep the lines between the two into the block, where the next
+# update would delete them.
+strip_unpaired_markers() {
+  local file=$1 start=$2 end=$3 legacy=$4
+  local tmp
+  if ! tmp=$(stage_file); then
+    warn "Could not create a temporary file; leaving ${file/#$HOME/~} unchanged."
+    return 1
+  fi
+  # Two passes over the same file: the first records the line numbers of
+  # unpaired markers, the second prints everything else. `FNR == NR` is true
+  # only on the first pass (on the second, NR is already past it).
+  if ! awk -v start="$start" -v end="$end" -v legacy="$legacy" '
+    FNR == NR {
+      if ($0 == start) { if (open) { drop[open] = 1 } open = FNR; next }
+      if ($0 == end || $0 == legacy) { if (open) { open = 0 } else { drop[FNR] = 1 } }
+      next
+    }
+    FNR == 1 { if (open) { drop[open] = 1 } open = 0 }
+    !(FNR in drop)
+  ' "$file" "$file" >"$tmp"; then
+    warn "Failed to stage the repair; leaving ${file/#$HOME/~} unchanged."
+    rm -f "$tmp"
+    return 1
+  fi
+  commit_staged "$file" "$tmp" 1
 }
 
 append_block() {
@@ -100,22 +170,24 @@ append_block() {
   # mere presence check is not enough: an orphaned end marker sitting BEFORE
   # an unmatched start marker satisfies "both strings appear", and the awk
   # below would then enter in_block at the unmatched start and run to EOF,
-  # discarding the rest of the user's rc file. Anything malformed -- reversed,
-  # duplicated or unterminated -- falls through to appending a fresh block,
-  # which leaves existing content alone.
+  # discarding the rest of the user's rc file.
+  #
+  # Repair the markers rather than appending a fresh block past the damage.
+  # Appending kept the user's content but never healed the file: the orphan
+  # survived, so every subsequent install appended again while remove_block --
+  # which refuses to touch a malformed file -- could never clean any of it up.
+  # The installer and the uninstaller took opposite actions on one condition,
+  # and the block became unremovable.
   if grep -F "$marker" "$file" >/dev/null 2>&1 &&
      ! markers_well_formed "$file" "$marker" "$end_marker" "$legacy_end_marker"; then
-    warn "Malformed myprompts block in ${file/#$HOME/~}; appending a new block and leaving your content untouched."
+    warn "Repairing a malformed myprompts block in ${file/#$HOME/~}: dropping unmatched marker lines, leaving your content in place."
+    strip_unpaired_markers "$file" "$marker" "$end_marker" "$legacy_end_marker" || return 1
   fi
   if grep -F "$marker" "$file" >/dev/null 2>&1 &&
      markers_well_formed "$file" "$marker" "$end_marker" "$legacy_end_marker"; then
     info "Updating existing block in ${file/#$HOME/~}."
-    local tmp tmp_base
-    # An explicit template so TMPDIR is honoured on macOS too, where a bare
-    # `mktemp` uses the Darwin per-user directory regardless.
-    tmp_base=${TMPDIR:-/tmp}
-    tmp_base=${tmp_base%/}
-    if ! tmp=$(mktemp "$tmp_base/myprompts.XXXXXX"); then
+    local tmp
+    if ! tmp=$(stage_file); then
       warn "Could not create a temporary file; leaving ${file/#$HOME/~} unchanged."
       return 1
     fi
@@ -130,26 +202,7 @@ append_block() {
       rm -f "$tmp"
       return 1
     fi
-    # `cat "$tmp" > "$file"` truncates $file before it can discover the
-    # staged copy is unusable, so validate first and keep a backup to restore
-    # from if the write itself fails partway.
-    if [[ ! -s $tmp ]]; then
-      warn "Staged update was empty; leaving ${file/#$HOME/~} unchanged."
-      rm -f "$tmp"
-      return 1
-    fi
-    local backup="$tmp.orig"
-    cp "$file" "$backup" 2>/dev/null || true
-    # Write into the existing file (not mv) so its mode, inode and symlink
-    # target survive; mktemp's 0600 temp file would otherwise tighten
-    # permissions and turn a symlinked rc into a regular file.
-    if ! cat "$tmp" > "$file"; then
-      warn "Write to ${file/#$HOME/~} failed; restoring the original."
-      [[ -f $backup ]] && cat "$backup" > "$file"
-      rm -f "$tmp" "$backup"
-      return 1
-    fi
-    rm -f "$tmp" "$backup"
+    commit_staged "$file" "$tmp" || return 1
   else
     {
       printf '\n%s\n' "$marker"

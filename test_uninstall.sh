@@ -501,6 +501,195 @@ test_uninstall_idempotent_on_clean_system() {
     rm -rf "$T"
 }
 
+# ---------------------------------------------------------------------------
+# Orphaned marker repair.
+#
+# append_block used to warn on a malformed block and append a fresh one past
+# it. That preserved user content but never healed the file: the orphan stayed,
+# so every subsequent install appended again (unbounded growth) and
+# remove_block -- which refuses to touch a malformed file -- could never clean
+# any of it up. The installer and the uninstaller took opposite actions on the
+# same condition. Repair the markers instead, so the file converges on a single
+# well-formed block that uninstall can remove.
+#
+# Only unpaired marker LINES are dropped. The extent of an unterminated block
+# is unknowable, so its body is left in place as ordinary content rather than
+# guessed at and deleted.
+count_lines() { grep -cFx "$2" "$1" 2>/dev/null || true; }
+
+test_append_block_repairs_orphaned_start_marker() {
+    test_start "append_block repairs an unterminated marker instead of appending past it"
+    local T; T=$(mktemp -d)
+    {
+        printf 'export BEFORE=1\n'
+        printf '# >>> myprompts prompt style >>>\n'
+        printf 'export MYPROMPTS_PROMPT_STYLE=stale\n'
+        printf 'export AFTER=1\n'
+    } > "$T/.bashrc"
+
+    ( load_shell_lib
+      append_block "$T/.bashrc" '# >>> myprompts prompt style >>>' 'export MYPROMPTS_PROMPT_STYLE=compact'
+      append_block "$T/.bashrc" '# >>> myprompts prompt style >>>' 'export MYPROMPTS_PROMPT_STYLE=compact'
+    ) >/dev/null 2>&1
+
+    local starts ends content
+    starts=$(count_lines "$T/.bashrc" '# >>> myprompts prompt style >>>')
+    ends=$(count_lines "$T/.bashrc" '# <<< myprompts prompt style <<<')
+    content=$(cat "$T/.bashrc")
+    rm -rf "$T"
+
+    if [ "$starts" != "1" ] || [ "$ends" != "1" ]; then
+        test_fail "expected exactly one marker pair after two installs, got $starts start / $ends end: $(printf '%s' "$content" | tr '\n' '|')"
+        return
+    fi
+    case "$content" in
+        *BEFORE=1*AFTER=1*) test_pass ;;
+        *) test_fail "repair dropped user content: $(printf '%s' "$content" | tr '\n' '|')" ;;
+    esac
+}
+
+test_append_block_repairs_out_of_order_markers() {
+    test_start "append_block repairs an end marker that precedes its start"
+    local T; T=$(mktemp -d)
+    {
+        printf 'export BEFORE=1\n'
+        printf '# <<< myprompts prompt style <<<\n'
+        printf '# >>> myprompts prompt style >>>\n'
+        printf 'export MYPROMPTS_PROMPT_STYLE=stale\n'
+        printf 'export AFTER=1\n'
+    } > "$T/.bashrc"
+
+    ( load_shell_lib
+      append_block "$T/.bashrc" '# >>> myprompts prompt style >>>' 'export MYPROMPTS_PROMPT_STYLE=compact'
+    ) >/dev/null 2>&1
+
+    local starts ends content
+    starts=$(count_lines "$T/.bashrc" '# >>> myprompts prompt style >>>')
+    ends=$(count_lines "$T/.bashrc" '# <<< myprompts prompt style <<<')
+    content=$(cat "$T/.bashrc")
+    rm -rf "$T"
+
+    if [ "$starts" != "1" ] || [ "$ends" != "1" ]; then
+        test_fail "expected exactly one marker pair, got $starts start / $ends end: $(printf '%s' "$content" | tr '\n' '|')"
+        return
+    fi
+    case "$content" in
+        *BEFORE=1*AFTER=1*) test_pass ;;
+        *) test_fail "repair dropped user content: $(printf '%s' "$content" | tr '\n' '|')" ;;
+    esac
+}
+
+# The point of repairing rather than appending: uninstall refuses to edit a
+# malformed file, so without repair the block is unremovable forever.
+test_uninstall_removes_block_that_install_repaired() {
+    test_start "uninstall removes a block that install repaired"
+    local T; T=$(mktemp -d)
+    {
+        printf 'export BEFORE=1\n'
+        printf '# >>> myprompts prompt >>>\n'
+        printf 'source /somewhere/old\n'
+        printf 'export AFTER=1\n'
+    } > "$T/.bashrc"
+
+    ( load_shell_lib
+      append_block "$T/.bashrc" '# >>> myprompts prompt >>>' 'source /somewhere/new'
+    ) >/dev/null 2>&1
+
+    if ! run_uninstall "$T"; then
+        test_fail "uninstall.sh failed"; rm -rf "$T"; return
+    fi
+
+    local starts content
+    starts=$(count_lines "$T/.bashrc" '# >>> myprompts prompt >>>')
+    content=$(cat "$T/.bashrc")
+    rm -rf "$T"
+
+    if [ "$starts" != "0" ]; then
+        test_fail "uninstall left $starts start marker(s) behind: $(printf '%s' "$content" | tr '\n' '|')"
+        return
+    fi
+    case "$content" in
+        *BEFORE=1*AFTER=1*) test_pass ;;
+        *) test_fail "uninstall dropped user content: $(printf '%s' "$content" | tr '\n' '|')" ;;
+    esac
+}
+
+# uninstall.sh is the recovery tool: it runs `set -euo pipefail` and sourcing a
+# missing lib/ would abort it outright, so it carries its own copy of
+# markers_well_formed rather than depending on lib/. Duplicated safety-critical
+# logic drifts silently, so assert the copies are identical instead.
+extract_function() {
+    awk -v fn="$2" '
+        $0 ~ "^" fn "\\(\\) \\{" { inside = 1 }
+        inside { print }
+        inside && /^\}/ { exit }
+    ' "$1"
+}
+
+test_markers_well_formed_copies_are_identical() {
+    test_start "markers_well_formed is identical in lib/shell.sh and uninstall.sh"
+    local a b
+    a=$(extract_function ./lib/shell.sh markers_well_formed)
+    b=$(extract_function ./uninstall.sh markers_well_formed)
+    if [ -z "$a" ] || [ -z "$b" ]; then
+        test_fail "could not extract markers_well_formed (lib/shell.sh: ${#a} bytes, uninstall.sh: ${#b} bytes)"
+        return
+    fi
+    assert_eq "$a" "$b" "markers_well_formed has drifted between lib/shell.sh and uninstall.sh"
+}
+
+# An rc file whose entire content is an orphaned marker repairs to empty before
+# the fresh block is appended. The staging guard that rejects an empty result
+# must not fire here, or this file can never be healed.
+test_append_block_repairs_marker_only_file() {
+    test_start "append_block repairs an rc file containing nothing but an orphaned marker"
+    local T; T=$(mktemp -d)
+    printf '# >>> myprompts prompt style >>>\n' > "$T/.bashrc"
+
+    ( load_shell_lib
+      append_block "$T/.bashrc" '# >>> myprompts prompt style >>>' 'export MYPROMPTS_PROMPT_STYLE=compact'
+    ) >/dev/null 2>&1
+
+    local starts ends content
+    starts=$(count_lines "$T/.bashrc" '# >>> myprompts prompt style >>>')
+    ends=$(count_lines "$T/.bashrc" '# <<< myprompts prompt style <<<')
+    content=$(cat "$T/.bashrc")
+    rm -rf "$T"
+
+    if [ "$starts" != "1" ] || [ "$ends" != "1" ]; then
+        test_fail "expected exactly one marker pair, got $starts start / $ends end: $(printf '%s' "$content" | tr '\n' '|')"
+        return
+    fi
+    assert_contains "$content" "export MYPROMPTS_PROMPT_STYLE=compact" "repaired file lost the block body"
+}
+
+# Two starts open at once: the repair must drop the EARLIER one, keeping the
+# tighter pair. Dropping the later start instead leaves the lines between the
+# two inside the block, and the very next update -- which replaces the block
+# body wholesale -- deletes them. Content preservation is the whole point of
+# repairing rather than truncating, so this is data loss, not a style choice.
+test_append_block_repair_keeps_lines_between_nested_starts() {
+    test_start "append_block repair keeps content between two unclosed start markers"
+    local T; T=$(mktemp -d)
+    {
+        printf 'export BEFORE=1\n'
+        printf '# >>> myprompts prompt style >>>\n'
+        printf 'export STRANDED=1\n'
+        printf '# >>> myprompts prompt style >>>\n'
+        printf 'export MYPROMPTS_PROMPT_STYLE=stale\n'
+        printf '# <<< myprompts prompt style <<<\n'
+        printf 'export AFTER=1\n'
+    } > "$T/.bashrc"
+
+    ( load_shell_lib
+      append_block "$T/.bashrc" '# >>> myprompts prompt style >>>' 'export MYPROMPTS_PROMPT_STYLE=compact'
+    ) >/dev/null 2>&1
+
+    local content; content=$(cat "$T/.bashrc")
+    rm -rf "$T"
+    assert_contains "$content" "export STRANDED=1" "repair swept a line between two start markers into the block, where the update deleted it"
+}
+
 test_rc_mode_returns_plain_octal
 test_uninstall_restores_rc_files_byte_identical
 test_uninstall_preserves_trailing_blank_line_byte_identical
@@ -517,4 +706,10 @@ test_uninstall_keeps_content_when_end_marker_missing
 test_install_keeps_content_when_end_marker_missing
 test_append_block_update_preserves_mode
 test_append_block_update_preserves_symlink
+test_append_block_repairs_orphaned_start_marker
+test_append_block_repairs_out_of_order_markers
+test_uninstall_removes_block_that_install_repaired
+test_append_block_repairs_marker_only_file
+test_append_block_repair_keeps_lines_between_nested_starts
+test_markers_well_formed_copies_are_identical
 test_summary

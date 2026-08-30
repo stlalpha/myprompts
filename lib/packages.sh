@@ -41,11 +41,47 @@ load_configuration() {
   ensure_array bash_aliases
 }
 
+# Where brew may live. macOS: /opt/homebrew (Apple silicon) and /usr/local
+# (Intel). Linuxbrew: the shared /home/linuxbrew prefix and a per-user
+# ~/.linuxbrew. Overridable so tests can point at a stub.
+MYPROMPTS_BREW_CANDIDATES=${MYPROMPTS_BREW_CANDIDATES:-"/opt/homebrew/bin/brew /usr/local/bin/brew /home/linuxbrew/.linuxbrew/bin/brew $HOME/.linuxbrew/bin/brew"}
+
 ensure_homebrew_in_path() {
-  if [[ -x /opt/homebrew/bin/brew ]]; then
-    eval "$(/opt/homebrew/bin/brew shellenv)"
-  elif [[ -x /usr/local/bin/brew ]]; then
-    eval "$(/usr/local/bin/brew shellenv)"
+  local candidates=()
+  read -r -a candidates <<<"$MYPROMPTS_BREW_CANDIDATES"
+  local candidate
+  for candidate in ${candidates[@]+"${candidates[@]}"}; do
+    if [[ -x $candidate ]]; then
+      eval "$("$candidate" shellenv)"
+      return
+    fi
+  done
+}
+
+# Homebrew on Linux is opt-in, and when active it fully replaces the native
+# package manager -- apt/dnf/pacman are not consulted at all. Unset means ask
+# interactively; non-interactive runs default to the native manager, so an
+# existing Linux install is unaffected.
+linux_brew_opt_in() {
+  local pref
+  pref=$(printf '%s' "${MYPROMPTS_LINUX_BREW:-}" | tr '[:upper:]' '[:lower:]')
+  case "$pref" in
+    1|true|yes|on) return 0 ;;
+    0|false|no|off) return 1 ;;
+    '') ;;
+    *) warn "Unrecognised MYPROMPTS_LINUX_BREW='${MYPROMPTS_LINUX_BREW:-}'; using the native package manager."
+       return 1 ;;
+  esac
+  (( INTERACTIVE )) || return 1
+  command -v prompt_yes_no >/dev/null 2>&1 || return 1
+  prompt_yes_no "Use Homebrew instead of the native package manager?" N
+}
+
+select_linux_manager() {
+  if linux_brew_opt_in; then
+    printf 'brew\n'
+  else
+    detect_linux_package_manager
   fi
 }
 
@@ -53,6 +89,13 @@ ensure_homebrew() {
   if command -v brew >/dev/null 2>&1; then
     ensure_homebrew_in_path
     return
+  fi
+
+  # Homebrew refuses to run as root, and on Linux the installer would place
+  # the prefix somewhere the invoking user cannot write.
+  if [[ ${EUID:-$(id -u)} -eq 0 ]]; then
+    error "Homebrew cannot be installed as root. Re-run as a normal user."
+    return 1
   fi
 
   info "Installing Homebrew (may prompt for your password)."
@@ -297,6 +340,15 @@ detect_installed_packages() {
       ;;
     linux)
       case "$mgr" in
+        brew)
+          ensure_homebrew_in_path
+          command -v brew >/dev/null 2>&1 || return
+          for pkg in "${macos_brew_formulae[@]}"; do
+            if brew list --formula "$pkg" >/dev/null 2>&1; then
+              printf '%s (formula)\n' "$pkg"
+            fi
+          done
+          ;;
         apt)
           for pkg in "${linux_apt_packages[@]}"; do
             if dpkg -s "$pkg" >/dev/null 2>&1; then
@@ -372,8 +424,9 @@ handle_package_bootstrap() {
   local mgr=""
   local mgr_label=""
   if [[ $os == linux ]]; then
-    mgr=$(detect_linux_package_manager)
+    mgr=$(select_linux_manager)
     case "$mgr" in
+      brew) mgr_label="Homebrew" ;;
       apt) mgr_label="apt" ;;
       dnf) mgr_label="dnf" ;;
       pacman)
@@ -409,6 +462,13 @@ handle_package_bootstrap() {
       ;;
     linux)
       case "$mgr" in
+        brew)
+          # Deliberately does not touch the apt/dnf/pacman pending arrays: when
+          # brew is active it is the only package manager used. Casks and the
+          # App Store stay macOS-only -- Linuxbrew has no cask support.
+          ensure_homebrew
+          IFS=$'\n' read -r -d '' -a pending_macos_brew_formulae < <(filter_missing_packages brew_formulae "${macos_brew_formulae[@]}" && printf '\0')
+          ;;
         apt)
           IFS=$'\n' read -r -d '' -a pending_linux_apt_packages < <(filter_missing_packages apt "${linux_apt_packages[@]}" && printf '\0')
           ;;
@@ -461,6 +521,9 @@ handle_package_bootstrap() {
       ;;
     linux)
       case "$mgr" in
+        brew)
+          print_pkg_group 'brew formulae' macos_brew_formulae "$VW_ORANGE" >&"$PROMPT_FD"
+          ;;
         apt)
           print_pkg_group 'apt packages' linux_apt_packages "$VW_ORANGE" >&"$PROMPT_FD"
           ;;
@@ -501,6 +564,12 @@ handle_package_bootstrap() {
     fi
   else
     case "$mgr" in
+      brew)
+        if [[ ${#pending_macos_brew_formulae[@]} -gt 0 ]]; then
+          print_pkg_list 'brew formulae' "$VW_ORANGE" "${pending_macos_brew_formulae[@]}" >&"$PROMPT_FD"
+          pending_shown=1
+        fi
+        ;;
       apt)
         if [[ ${#pending_linux_apt_packages[@]} -gt 0 ]]; then
           print_pkg_list 'apt packages' "$VW_ORANGE" "${pending_linux_apt_packages[@]}" >&"$PROMPT_FD"

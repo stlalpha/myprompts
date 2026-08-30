@@ -42,6 +42,20 @@ Themed shell prompt system with automated configuration and package installation
 - Installed to `~/.config/fastfetch/config.jsonc`; layout chosen by
   `choose_fastfetch_style` (`FASTFETCH_STYLE=vaporwave|boxed`).
 
+### Homebrew on Linux
+- Opt-in via `MYPROMPTS_LINUX_BREW=1` or an interactive prompt; default is the
+  native package manager, so existing Linux installs are unaffected.
+- When active it **replaces** apt/dnf/pacman rather than supplementing them.
+  `select_linux_manager` returns `brew`, and `handle_package_bootstrap` fills
+  `pending_macos_brew_formulae` while leaving the native pending arrays empty.
+- Packages are installed by Ansible, not by the `install_*` functions in
+  `lib/packages.sh` (those are dead code). The signal reaches the playbook as
+  `package_manager: "brew"` in the generated vars file, and the formulae task
+  is gated on `target_os == 'macos' or package_manager == 'brew'`.
+- Casks and App Store apps stay macOS-only — Linuxbrew has no cask support.
+- `MYPROMPTS_BREW_CANDIDATES` lists the brew locations probed by
+  `ensure_homebrew_in_path`; it exists so tests can inject a stub.
+
 ### Mac App Store Integration
 - Uses `mas` CLI tool via Ansible's `community.general.mas` module
 - `mas account` is broken on macOS 12+ due to Apple framework changes

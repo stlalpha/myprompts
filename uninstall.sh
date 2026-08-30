@@ -25,8 +25,11 @@ warn()  { printf '\033[1;33m[warn]\033[0m %s\n' "$*" >&2; }
 # trailing blank line before the block was appended) and must survive, or a
 # round trip of install then uninstall will not be byte-identical.
 # True only when every opening marker is closed by a later terminator, with no
-# stray terminator before one and none left open at EOF. lib/shell.sh carries
-# an identical copy; this script is deliberately standalone.
+# stray terminator before one and none left open at EOF. lib/shell.sh carries a
+# byte-identical copy: this script is the recovery tool and runs
+# `set -euo pipefail`, so sourcing a lib/ that had gone missing would abort the
+# uninstall outright -- a worse failure than duplication. test_uninstall.sh
+# asserts the two copies never drift.
 markers_well_formed() {
   local file=$1 start=$2 end=$3 legacy=$4
   awk -v start="$start" -v end="$end" -v legacy="$legacy" '

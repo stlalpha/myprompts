@@ -134,6 +134,19 @@ source vaporwave_ls_setup.sh
     └── playbook.yml            # Package installation playbook
 ```
 
+## Command Duration
+
+The Bash prompt times each command and shows the elapsed seconds once it
+crosses `MYPROMPTS_DURATION_MIN`. On Bash 4.4+ it arms the timer through
+`PS0`, appending to any `PS0` you already set and leaving `DEBUG` traps
+untouched.
+
+Bash 3.2 (the macOS system Bash) has no `PS0`, so it falls back to a `DEBUG`
+trap. If you already have a `DEBUG` trap of your own, Bash 3.2 will not let a
+sourced file replace it, and a sourced file cannot read it either — so your
+trap keeps working and no duration is shown. Upgrading to a current Bash
+(`brew install bash`) removes the limitation.
+
 ## Requirements
 
 - Bash 3.2+ or Zsh

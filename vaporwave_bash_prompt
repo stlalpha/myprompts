@@ -133,51 +133,41 @@ myprompts_build_ps1() {
     fi
 }
 
-# Chain onto any pre-existing DEBUG trap instead of clobbering it.
+# Arm the command timer just before each command runs.
 #
-# `trap -p DEBUG` prints a valid shell command (`trap -- 'BODY' DEBUG`), so
-# the previous body must never be recovered by string-trimming that output:
-# an empty body (the common `trap '' DEBUG` idiom for disabling tracing)
-# leaves a bare "; myprompts_timer_start", which bash rejects as a syntax
-# error before every command; a body containing a single quote defeats the
-# strip entirely, silently leaving the old trap in place with our timer
-# never installed. Instead, shadow the `trap` builtin with a function and let
-# bash's own parser hand us the body as $2.
+# bash 4.4+ has PS0, which the shell expands before running each command
+# line. PS0 is an ordinary variable, so we can append to whatever the user
+# already set instead of replacing it, and it cannot collide with a DEBUG
+# trap at all. The expansion has to produce no output, hence slicing an
+# always-empty variable to zero length; the arithmetic inside the slice is
+# what actually arms the timer, and the comma operator discards its value.
 #
-# Deliberately NOT reset to empty on every source: re-sourcing must not
-# forget a body captured on the first source (see the dispatch-already
-# installed case below).
-myprompts_prev_debug_cmd=${myprompts_prev_debug_cmd:-}
+# bash 3.2 (the macOS system bash) has no PS0 and falls back to a DEBUG
+# trap. That fallback deliberately does not try to chain onto a DEBUG trap
+# the user set first, because it cannot: a sourced file cannot read an
+# inherited DEBUG trap -- `trap -p DEBUG` reports nothing from inside one,
+# at function scope, at file scope, and through a redirect alike -- and bash
+# 3.2 will not let a sourced file replace one either. When the user already
+# has a DEBUG trap on bash 3.2, theirs keeps working and no duration is
+# shown. On bash 4.4+ both work.
+# Referenced only from inside the single-quoted PS0 below, which the shell
+# expands at prompt time -- shellcheck cannot see that use.
+# shellcheck disable=SC2034
+myprompts_ps0_nil=''
 
-myprompts_capture_debug_trap() {
-    local spec
-    spec=$(trap -p DEBUG)
-    [ -n "$spec" ] || return 0
-    case "$spec" in
-        *myprompts_debug_dispatch*)
-            # Our dispatcher is already installed (idempotent re-source).
-            # Leave myprompts_prev_debug_cmd untouched -- recapturing here
-            # would set it to "myprompts_debug_dispatch" itself, and the
-            # dispatcher would recurse into itself forever.
-            return 0
-            ;;
+if [ "${BASH_VERSINFO[0]}" -gt 4 ] ||
+   { [ "${BASH_VERSINFO[0]}" -eq 4 ] && [ "${BASH_VERSINFO[1]}" -ge 4 ]; }; then
+    # SC2016 is deliberate here: PS0 must reach the shell unexpanded so it is
+    # evaluated at prompt time. A directive cannot sit on a single case
+    # branch, so it scopes the whole statement.
+    # shellcheck disable=SC2016
+    case "${PS0:-}" in
+        *myprompts_ps0_nil*) ;;  # already installed; re-sourcing must not stack
+        *) PS0='${myprompts_ps0_nil:0:$((myprompts_timer=SECONDS, 0))}'"${PS0:-}" ;;
     esac
-    # shellcheck disable=SC2329  # invoked indirectly, via the eval below
-    trap() { myprompts_prev_debug_cmd=$2; }
-    eval "$spec" || true
-    unset -f trap
-}
-myprompts_capture_debug_trap
-unset -f myprompts_capture_debug_trap
-
-myprompts_debug_dispatch() {
-    if [ -n "${myprompts_prev_debug_cmd:-}" ]; then
-        eval "$myprompts_prev_debug_cmd"
-    fi
-    myprompts_timer_start
-}
-
-trap myprompts_debug_dispatch DEBUG
+else
+    trap myprompts_timer_start DEBUG
+fi
 
 case ";${PROMPT_COMMAND:-};" in
     *";myprompts_build_ps1;"*) ;;

@@ -6,8 +6,10 @@ cd "$(dirname "$0")" || exit 1
 # shellcheck disable=SC1091 # test_helpers.sh is committed alongside this script
 source ./test_helpers.sh
 
-# Bash 3.2 is the floor: macOS ships 3.2.57 as /bin/bash.
-BASH32=/bin/bash
+# Bash 3.2 is the floor: macOS ships 3.2.57 as /bin/bash. Overridable so the
+# same suite can be pointed at a bash 5.x build locally to reproduce what CI
+# sees on Linux.
+BASH32=${BASH32:-/bin/bash}
 
 # `timeout` is a GNU coreutils tool, not part of stock macOS -- only use it as
 # a hang-guard when present, so a regression that reintroduces unbounded
@@ -19,6 +21,22 @@ run_bounded() {
     else
         "$@"
     fi
+}
+
+# PS0 is expanded only by an *interactive* shell's read-eval loop, and `bash
+# -i -c 'script'` never enters that loop. Feeding the script on stdin does, so
+# that is the only way to exercise PS0-based timing.
+run_interactive() {
+    run_bounded "$BASH32" -i 2>/dev/null
+}
+
+# PS0 arrived in bash 4.4. Below that the prompt falls back to a DEBUG trap,
+# which carries a limitation the PS0 path does not (see the tests below).
+bash32_supports_ps0() {
+    # shellcheck disable=SC2016 # single-quoted: expands inside the nested bash, not here
+    "$BASH32" -c '
+        [ "${BASH_VERSINFO[0]}" -gt 4 ] ||
+        { [ "${BASH_VERSINFO[0]}" -eq 4 ] && [ "${BASH_VERSINFO[1]}" -ge 4 ]; }' 2>/dev/null
 }
 
 # Interrogate the actual bash under test (not the shell running this script —
@@ -184,24 +202,90 @@ test_ssh_marker() {
     assert_contains "$out" "ssh" "ssh marker"
 }
 
-test_debug_trap_chains() {
-    test_start "DEBUG trap chains rather than clobbering a pre-existing trap"
+# Contract: sourcing the prompt must never silence a DEBUG trap the user
+# already had. This is asserted behaviourally -- by whether the user's trap
+# body still runs -- because `trap -p DEBUG` is not readable from inside a
+# sourced file and grepping its output proves nothing.
+#
+# The counter is reset AFTER sourcing: a pre-existing DEBUG trap fires during
+# the source itself, so a boolean "did it ever fire" check passes even when
+# sourcing subsequently destroys the trap.
+test_user_debug_trap_survives_sourcing() {
+    test_start "a pre-existing DEBUG trap still fires after sourcing"
     local out
-    out=$("$BASH32" -c '
-        trap "MARKER=touched" DEBUG
+    # shellcheck disable=SC2016 # single-quoted: expands inside the nested bash, not here
+    out=$(run_bounded "$BASH32" -c '
+        trap "COUNT=\$((COUNT+1))" DEBUG
         source ./vaporwave_bash_prompt >/dev/null 2>&1
-        trap -p DEBUG' 2>&1)
-    assert_contains "$out" "MARKER=touched" "original DEBUG trap preserved"
+        COUNT=0
+        :
+        printf "fired=%s" "$COUNT"' 2>&1)
+    case "$out" in
+        fired=0) test_fail "sourcing destroyed the user's DEBUG trap (it never fired again)" ;;
+        fired=*) test_pass ;;
+        *) test_fail "assertion error: unexpected probe output '$out'" ;;
+    esac
 }
 
-# Regression test for a real bug: naive `trap -p` string-trimming turned an
-# empty pre-existing DEBUG trap (the standard idiom for disabling tracing)
-# into "; myprompts_timer_start", which bash rejects with a syntax error
-# before every single command -- making the shell unusable.
+# The timer must still arm when the user already has a DEBUG trap. On bash
+# 4.4+ the prompt uses PS0, which is independent of DEBUG, so this holds. On
+# bash 3.2 it cannot: a sourced file may not replace an inherited DEBUG trap
+# there, so the user's trap wins and no duration is shown -- a documented
+# platform limitation, not a regression.
+test_timer_arms_with_pre_existing_debug_trap() {
+    if ! bash32_supports_ps0; then
+        test_skip "timer arms alongside a pre-existing DEBUG trap" \
+                  "bash 3.2 cannot install a hook over an inherited DEBUG trap"
+        return
+    fi
+    test_start "timer arms alongside a pre-existing DEBUG trap"
+    local out
+    # shellcheck disable=SC2016 # single-quoted heredoc: expands inside the nested bash, not here
+    out=$(run_interactive <<'EOS' 2>&1
+trap 'USERTRAP=1' DEBUG
+source ./vaporwave_bash_prompt >/dev/null 2>&1
+USERTRAP=
+unset myprompts_timer
+:
+printf "timer=%s usertrap=%s\n" "${myprompts_timer:-none}" "${USERTRAP:-none}"
+EOS
+)
+    case "$out" in
+        *timer=none*) test_fail "timer never armed with a pre-existing DEBUG trap: $out" ;;
+        *usertrap=none*) test_fail "user's DEBUG trap stopped firing: $out" ;;
+        *timer=[0-9]*) test_pass ;;
+        *) test_fail "assertion error: unexpected probe output '$out'" ;;
+    esac
+}
+
+# The timer must arm in the ordinary case (no pre-existing DEBUG trap) on
+# every supported bash, including 3.2.
+test_timer_arms_without_pre_existing_trap() {
+    test_start "timer arms when no DEBUG trap pre-exists"
+    local out
+    out=$(run_interactive <<'EOS' 2>&1
+source ./vaporwave_bash_prompt >/dev/null 2>&1
+unset myprompts_timer
+:
+printf "timer=%s\n" "${myprompts_timer:-none}"
+EOS
+)
+    case "$out" in
+        *timer=[0-9]*) test_pass ;;
+        *timer=none*) test_fail "timer never armed: $out" ;;
+        *) test_fail "assertion error: unexpected probe output '$out'" ;;
+    esac
+}
+
+# Regression test for a real bug: an empty pre-existing DEBUG trap (the
+# standard `trap '' DEBUG` idiom for disabling tracing) used to be recovered
+# by string-trimming `trap -p` output, leaving a bare
+# "; myprompts_timer_start" that bash rejects with a syntax error before
+# every single command -- making the shell unusable.
 test_debug_trap_empty_previous() {
     test_start "empty pre-existing DEBUG trap does not corrupt the shell"
     local err
-    err=$("$BASH32" -c '
+    err=$(run_bounded "$BASH32" -c '
         trap "" DEBUG
         source ./vaporwave_bash_prompt 2>/dev/null
         :
@@ -210,36 +294,24 @@ test_debug_trap_empty_previous() {
         test_fail "sourcing with an empty prior DEBUG trap wrote to stderr: $err"
         return
     fi
-    local out
-    # shellcheck disable=SC2016 # single-quoted: expands inside the nested bash -c, not here
-    out=$("$BASH32" -c '
-        trap "" DEBUG
-        source ./vaporwave_bash_prompt >/dev/null 2>&1
-        trap -p DEBUG
-        :
-        printf "timer_set=%s" "${myprompts_timer:+yes}"' 2>&1)
-    case "$out" in
-        *myprompts_debug_dispatch*timer_set=yes*) test_pass ;;
-        *) test_fail "expected dispatcher installed and timer running, got: $out" ;;
-    esac
+    test_pass
 }
 
-# Regression test for a real bug: naive `trap -p` string-trimming does not
-# understand bash's '\'' escaping for a single quote inside the previous
-# trap body, so the re-quoted `trap` command failed and the pre-existing
-# trap was left in place with myprompts_timer_start never installed.
+# Regression test for a real bug: recovering the previous trap body by
+# string-trimming did not understand bash's '\'' escaping for a single quote,
+# so a body containing one silently defeated the whole mechanism. Asserted
+# behaviourally: the user's trap must still run.
 test_debug_trap_single_quote_previous() {
-    test_start "pre-existing DEBUG trap containing a single quote still runs, and the timer still installs"
+    test_start "pre-existing DEBUG trap containing a single quote still fires after sourcing"
     local out
-    # shellcheck disable=SC2016 # single-quoted: expands inside the nested bash -c, not here
-    out=$("$BASH32" -c '
+    # shellcheck disable=SC2016 # single-quoted: expands inside the nested bash, not here
+    out=$(run_bounded "$BASH32" -c '
         trap "MARK='"'"'yes'"'"'" DEBUG
         source ./vaporwave_bash_prompt >/dev/null 2>&1
+        MARK=
         :
-        printf "MARK=%s timer_set=%s" "$MARK" "${myprompts_timer:+yes}"' 2>&1)
-    assert_contains "$out" "MARK=yes" "original single-quote trap body still executed"
-    test_start "  ...and myprompts_timer_start also ran"
-    assert_contains "$out" "timer_set=yes" "timer installed alongside the original trap body"
+        printf "MARK=%s" "$MARK"' 2>&1)
+    assert_contains "$out" "MARK=yes" "single-quote trap body still executed after sourcing"
 }
 
 # Regression test for a real bug: sourcing twice with a pre-existing trap
@@ -311,7 +383,9 @@ test_duration_segment_above_threshold
 test_duration_segment_below_threshold
 test_root_marker
 test_ssh_marker
-test_debug_trap_chains
+test_user_debug_trap_survives_sourcing
+test_timer_arms_with_pre_existing_debug_trap
+test_timer_arms_without_pre_existing_trap
 test_debug_trap_empty_previous
 test_debug_trap_single_quote_previous
 test_debug_trap_double_source_no_recursion

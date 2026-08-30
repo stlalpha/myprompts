@@ -690,6 +690,76 @@ test_append_block_repair_keeps_lines_between_nested_starts() {
     assert_contains "$content" "export STRANDED=1" "repair swept a line between two start markers into the block, where the update deleted it"
 }
 
+# An rc file carrying only an orphaned END marker has no start marker, so the
+# repair used to be skipped entirely and a fresh block was appended after the
+# orphan. The file stayed malformed, and remove_block -- which refuses to touch
+# a malformed file -- could not remove the block that had just been added.
+test_append_block_repairs_orphaned_end_marker_alone() {
+    test_start "append_block repairs an rc file with only an orphaned end marker"
+    local T; T=$(mktemp -d)
+    {
+        printf 'export BEFORE=1\n'
+        printf '# <<< myprompts prompt <<<\n'
+        printf 'export AFTER=1\n'
+    } > "$T/.bashrc"
+
+    ( load_shell_lib
+      append_block "$T/.bashrc" '# >>> myprompts prompt >>>' 'source /somewhere/new'
+    ) >/dev/null 2>&1
+
+    if ! run_uninstall "$T"; then
+        test_fail "uninstall.sh failed"; rm -rf "$T"; return
+    fi
+
+    local starts content
+    starts=$(count_lines "$T/.bashrc" '# >>> myprompts prompt >>>')
+    content=$(cat "$T/.bashrc")
+    rm -rf "$T"
+
+    if [ "$starts" != "0" ]; then
+        test_fail "uninstall could not remove the block: $(printf '%s' "$content" | tr '\n' '|')"
+        return
+    fi
+    case "$content" in
+        *BEFORE=1*AFTER=1*) test_pass ;;
+        *) test_fail "repair dropped user content: $(printf '%s' "$content" | tr '\n' '|')" ;;
+    esac
+}
+
+# The legacy asymmetric terminator "# <<< NAME >>>" must be repaired too when
+# it appears alone, or old installs hit the same trap.
+test_append_block_repairs_orphaned_legacy_end_marker_alone() {
+    test_start "append_block repairs an rc file with only an orphaned legacy end marker"
+    local T; T=$(mktemp -d)
+    {
+        printf 'export BEFORE=1\n'
+        printf '# <<< myprompts prompt >>>\n'
+        printf 'export AFTER=1\n'
+    } > "$T/.bashrc"
+
+    ( load_shell_lib
+      append_block "$T/.bashrc" '# >>> myprompts prompt >>>' 'source /somewhere/new'
+    ) >/dev/null 2>&1
+
+    if ! run_uninstall "$T"; then
+        test_fail "uninstall.sh failed"; rm -rf "$T"; return
+    fi
+
+    local starts content
+    starts=$(count_lines "$T/.bashrc" '# >>> myprompts prompt >>>')
+    content=$(cat "$T/.bashrc")
+    rm -rf "$T"
+
+    if [ "$starts" != "0" ]; then
+        test_fail "uninstall could not remove the block: $(printf '%s' "$content" | tr '\n' '|')"
+        return
+    fi
+    case "$content" in
+        *BEFORE=1*AFTER=1*) test_pass ;;
+        *) test_fail "repair dropped user content: $(printf '%s' "$content" | tr '\n' '|')" ;;
+    esac
+}
+
 test_rc_mode_returns_plain_octal
 test_uninstall_restores_rc_files_byte_identical
 test_uninstall_preserves_trailing_blank_line_byte_identical
@@ -711,5 +781,7 @@ test_append_block_repairs_out_of_order_markers
 test_uninstall_removes_block_that_install_repaired
 test_append_block_repairs_marker_only_file
 test_append_block_repair_keeps_lines_between_nested_starts
+test_append_block_repairs_orphaned_end_marker_alone
+test_append_block_repairs_orphaned_legacy_end_marker_alone
 test_markers_well_formed_copies_are_identical
 test_summary

@@ -88,6 +88,22 @@ markers_well_formed() {
 
 # An explicit template so TMPDIR is honoured on macOS too, where a bare
 # `mktemp` uses the Darwin per-user directory regardless. Prints the path.
+# True when any of the given marker strings appears in the file. The repair gate
+# cannot key on the start marker alone: an rc file carrying only an orphaned END
+# marker has no start, so repair was skipped and a fresh block appended after
+# the orphan -- leaving the file malformed and the new block unremovable.
+markers_present() {
+  local file=$1
+  shift
+  local m
+  for m in "$@"; do
+    if grep -Fq "$m" "$file"; then
+      return 0
+    fi
+  done
+  return 1
+}
+
 stage_file() {
   local tmp_base=${TMPDIR:-/tmp}
   tmp_base=${tmp_base%/}
@@ -178,7 +194,7 @@ append_block() {
   # which refuses to touch a malformed file -- could never clean any of it up.
   # The installer and the uninstaller took opposite actions on one condition,
   # and the block became unremovable.
-  if grep -F "$marker" "$file" >/dev/null 2>&1 &&
+  if markers_present "$file" "$marker" "$end_marker" "$legacy_end_marker" &&
      ! markers_well_formed "$file" "$marker" "$end_marker" "$legacy_end_marker"; then
     warn "Repairing a malformed myprompts block in ${file/#$HOME/~}: dropping unmatched marker lines, leaving your content in place."
     strip_unpaired_markers "$file" "$marker" "$end_marker" "$legacy_end_marker" || return 1

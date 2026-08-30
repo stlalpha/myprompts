@@ -3,8 +3,15 @@
 // upstream in 2024 and dropped by every package manager this project targets.
 //
 // Palette: cyan 44, dark cyan 24 -- the same 256-colour indices the neofetch
-// layout used. The border rows are `custom` modules, which is how fastfetch
-// prints literal text where neofetch used `prin`.
+// layout used.
+//
+// The box is NOT drawn here. fastfetch has no way to pad a line to a fixed
+// width (--key-width aligns keys only, and format strings have no width
+// specifier), so a right-hand border cannot be closed from config: values are
+// variable length. This file emits the left rail and the blank divider rows
+// only; boxfetch.sh measures the rendered output and draws the top, bottom and
+// right edges to fit. Running fastfetch on this config directly is supported --
+// you just get the box's left rail without a right one.
 {
   "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
 
@@ -26,10 +33,6 @@
 
   "modules": [
     "break",
-    {
-      "type": "custom",
-      "format": "\u001b[38;5;44m .----------------------------------------.\u001b[0m"
-    },
     {
       "type": "title",
       "key": " :  User",
@@ -62,7 +65,7 @@
     },
     {
       "type": "custom",
-      "format": "\u001b[38;5;44m :                                        :\u001b[0m"
+      "format": "\u001b[38;5;44m :\u001b[0m"
     },
     {
       "type": "cpu",
@@ -91,7 +94,7 @@
     },
     {
       "type": "custom",
-      "format": "\u001b[38;5;44m :                                        :\u001b[0m"
+      "format": "\u001b[38;5;44m :\u001b[0m"
     },
     {
       "type": "localip",
@@ -102,10 +105,6 @@
       "type": "publicip",
       "key": " :  Public",
       "keyColor": "38;5;44"
-    },
-    {
-      "type": "custom",
-      "format": "\u001b[38;5;44m `----------------------------------------'\u001b[0m"
     },
     "break"
   ]

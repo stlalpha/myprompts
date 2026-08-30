@@ -41,6 +41,19 @@ Themed shell prompt system with automated configuration and package installation
   `${c1}`/`${c2}`. `tools/scale_ascii.py` reads that same syntax.
 - Installed to `~/.config/fastfetch/config.jsonc`; layout chosen by
   `choose_fastfetch_style` (`FASTFETCH_STYLE=vaporwave|boxed`).
+- The ASCII logo ships as the 60% reduction (`signalmine_60.txt`);
+  `signalmine.txt` is the full-size master the scaler reads from. Regenerate
+  the variants with `tools/scale_ascii.py <src> <scale> <dst>` -- it box-filters
+  the glyph density ramp rather than subsampling, which is what keeps
+  one-glyph-wide strokes alive at 50%.
+- The boxed layout's frame is drawn by `fastfetch/boxfetch.sh`, not by the
+  config. fastfetch cannot close a right-hand border: values are variable
+  length and it has no line-padding or right-align facility (`--key-width`
+  aligns keys only; format strings take no width specifier, and defaults are
+  compiled in so they cannot be re-emitted with a trailing rail). boxfetch.sh
+  runs fastfetch with `--logo none --pipe false`, measures the rendered width,
+  draws all four edges to fit, then pastes the logo alongside. Exposed as the
+  `sysinfo` alias; plain `fastfetch` still works and just shows the left rail.
 
 ### Homebrew on Linux
 - Opt-in via `MYPROMPTS_LINUX_BREW=1` or an interactive prompt; default is the
@@ -178,6 +191,8 @@ linux_paru_packages=(gnu-netcat YOUR_AUR_PACKAGE)
 - `vaporwave_zsh_prompt`: Zsh native prompt mirroring Bash layout with Zsh-specific hooks
 - `vaporwave_lscolors`: Exported `LS_COLORS` table for file extension colorization
 - `vaporwave_ls_setup.sh`: Helper to wire LS colors (for manual sourcing, legacy)
+- `fastfetch/boxfetch.sh`: draws the closed box around fastfetch output (fastfetch cannot pad lines, so the frame must be measured after the fact)
+- `tools/scale_ascii.py`: density-preserving downscaler for the ASCII logo
 - `ansible/playbook.yml`: Local package installation with conditional blocks per package manager
 - `config/packages.sh`: Platform-specific package definitions (Bash arrays)
 - `config/aliases.sh`: Shell-specific alias definitions (Bash arrays)

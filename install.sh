@@ -62,13 +62,28 @@ else
   fi
 fi
 
+# The bootstrap drops this file into the directory it creates. cleanup() will
+# not remove anything that lacks it, so a MYPROMPTS_TMP_SRC inherited from the
+# caller's environment can never cause an unrelated directory to be deleted.
+MYPROMPTS_TMP_SENTINEL=.myprompts-bootstrap
+
+myprompts_tmp_is_ours() {
+  local dir=${1:-}
+  [[ -n $dir && -d $dir ]] || return 1
+  [[ -f "$dir/$MYPROMPTS_TMP_SENTINEL" ]] || return 1
+  case "${dir##*/}" in
+    myprompts.??????) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 cleanup() {
   if [[ $TTY_FD_OPENED -eq 1 ]]; then
     exec 3>&-
   fi
   # Set only when this process was re-exec'd out of a fetched tarball. By the
   # time the trap runs the install has copied everything it needs out of it.
-  if [[ -n ${MYPROMPTS_TMP_SRC:-} && -d ${MYPROMPTS_TMP_SRC:-} ]]; then
+  if myprompts_tmp_is_ours "${MYPROMPTS_TMP_SRC:-}"; then
     rm -rf "$MYPROMPTS_TMP_SRC"
   fi
 }
@@ -88,6 +103,14 @@ myprompts_bootstrap() {
 
   if [[ -n $self_dir && -d "$self_dir/lib" && -f "$self_dir/lib/ui.sh" ]]; then
     MYPROMPTS_SRC=$self_dir
+    # Nothing was fetched by THIS process. That covers two cases: a real clone,
+    # where any MYPROMPTS_TMP_SRC came from the caller's environment and must
+    # be dropped; and the re-exec'd child of a bootstrap, which also resolves
+    # via the adjacent lib/ but whose inherited value is the tree it must
+    # clean up. The sentinel tells them apart.
+    if ! myprompts_tmp_is_ours "${MYPROMPTS_TMP_SRC:-}"; then
+      unset MYPROMPTS_TMP_SRC
+    fi
     return 0
   fi
 
@@ -98,6 +121,13 @@ myprompts_bootstrap() {
   tmp_base=${TMPDIR:-/tmp}
   tmp_base=${tmp_base%/}
   tmp=$(mktemp -d "$tmp_base/myprompts.XXXXXX")
+  # Mark it as ours before anything else can fail. cleanup() removes only
+  # directories carrying this sentinel, so an inherited MYPROMPTS_TMP_SRC
+  # pointing at unrelated data is never touched.
+  : > "$tmp/$MYPROMPTS_TMP_SENTINEL"
+  # Export before the fetch, not after: if the curl | tar pipeline fails, the
+  # EXIT trap still knows what to clean up.
+  export MYPROMPTS_TMP_SRC=$tmp
   echo "Fetching myprompts..."
   # /archive/<ref>.tar.gz resolves a branch, a tag or a commit SHA. The
   # /archive/refs/heads/<ref>.tar.gz form this used to build only resolves
@@ -105,11 +135,10 @@ myprompts_bootstrap() {
   curl -fsSL "$MYPROMPTS_REPO/archive/$MYPROMPTS_REF.tar.gz" \
     | tar -xz -C "$tmp" --strip-components=1
   MYPROMPTS_SRC=$tmp
-  # exec replaces this process, so its EXIT trap never runs and the extracted
-  # tree would leak. Hand the path to the child, whose cleanup() removes it.
+  # exec replaces this process, so its EXIT trap never runs; the child's
+  # cleanup() removes the tree instead (MYPROMPTS_TMP_SRC was exported above).
   # The child is whichever version MYPROMPTS_REF names, so fetching a ref older
   # than this change still leaks -- nothing this side can do about that.
-  export MYPROMPTS_TMP_SRC=$tmp
   exec bash "$tmp/install.sh" "$@"
 }
 

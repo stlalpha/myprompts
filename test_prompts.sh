@@ -375,13 +375,23 @@ test_debug_trap_double_source_no_recursion() {
 test_build_ps1_returns_success() {
     test_start "myprompts_build_ps1 returns success when elapsed is zero"
     local status
+    # Two things make this actually catch the arithmetic-command form:
+    #   - `unset SECONDS; SECONDS=0` turns SECONDS into an ordinary variable
+    #     that stays 0, so `SECONDS - myprompts_timer` is deterministically 0
+    #     and `((...))` returns status 1.
+    #   - `set -e` turns that status into an abort, so the printf never runs
+    #     and the captured output is empty. Without errexit the function would
+    #     reach its final PS1 assignment and report 0 with the bug still there.
     # shellcheck disable=SC2016 # single-quoted: expands inside the nested bash, not here
     status=$("$BASH32" -c '
+        set -e
         source ./vaporwave_bash_prompt >/dev/null 2>&1
-        myprompts_timer=$SECONDS
+        unset SECONDS
+        SECONDS=0
+        myprompts_timer=0
         myprompts_build_ps1 >/dev/null 2>&1
         printf %s "$?"' 2>&1)
-    assert_eq "0" "$status" "exit status of myprompts_build_ps1"
+    assert_eq "0" "$status" "exit status of myprompts_build_ps1 with a zero duration"
 }
 
 test_build_ps1_single_command_substitution() {

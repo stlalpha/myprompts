@@ -271,6 +271,27 @@ test_bootstrap_fetches_non_branch_ref_and_cleans_up() {
     assert_eq "0" "$leftover" "temp directories left behind by the bootstrap"
 }
 
+# cleanup() removes the directory named by MYPROMPTS_TMP_SRC. The variable is
+# exported by the bootstrap for its re-exec'd child, but nothing distinguished
+# that from a value inherited from the caller's environment -- so running the
+# installer from a clone with MYPROMPTS_TMP_SRC set in the environment deleted
+# whatever it pointed at.
+test_inherited_tmp_src_is_not_deleted() {
+    test_start "an inherited MYPROMPTS_TMP_SRC is never deleted"
+    local T; T=$(mktemp -d)
+    mkdir -p "$T/precious" "$T/home"
+    printf 'IRREPLACEABLE\n' > "$T/precious/data.txt"
+
+    env HOME="$T/home" INSTALL_ROOT="$T/home/ir" MYPROMPTS_NONINTERACTIVE=1 \
+        PROMPT_STYLE=compact SHELL=/bin/bash MYPROMPTS_TMP_SRC="$T/precious" \
+        bash ./install.sh >/dev/null 2>&1 || true
+
+    local survived=no
+    [[ -f "$T/precious/data.txt" ]] && survived=yes
+    rm -rf "$T"
+    assert_eq "yes" "$survived" "caller's directory survived the install"
+}
+
 test_no_neofetch_references() {
     test_start "no neofetch references remain in the executable surface"
     local hits
@@ -357,6 +378,7 @@ main() {
     test_reinstall_flow
     test_fastfetch_config_backed_up
     test_bootstrap_fetches_non_branch_ref_and_cleans_up
+    test_inherited_tmp_src_is_not_deleted
     test_no_neofetch_references
     test_fastfetch_configs_parse
     test_shellcheck

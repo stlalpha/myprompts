@@ -1,0 +1,112 @@
+// Signal Mine boxed fastfetch config.
+// Ported from the neofetch config of the same name; neofetch was archived
+// upstream in 2024 and dropped by every package manager this project targets.
+//
+// Palette: cyan 44, dark cyan 24 -- the same 256-colour indices the neofetch
+// layout used. The border rows are `custom` modules, which is how fastfetch
+// prints literal text where neofetch used `prin`.
+{
+  "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
+
+  "logo": {
+    "type": "file",
+    "source": "~/.config/fastfetch/signalmine.txt",
+    "color": {
+      "1": "38;5;44",
+      "2": "38;5;24"
+    },
+    "padding": {
+      "right": 2
+    }
+  },
+
+  "display": {
+    "separator": "  "
+  },
+
+  "modules": [
+    "break",
+    {
+      "type": "custom",
+      "format": "\u001b[38;5;44m .----------------------------------------.\u001b[0m"
+    },
+    {
+      "type": "title",
+      "key": " :  User",
+      "keyColor": "38;5;44"
+    },
+    {
+      "type": "os",
+      "key": " :  OS",
+      "keyColor": "38;5;44"
+    },
+    {
+      "type": "host",
+      "key": " :  Host",
+      "keyColor": "38;5;44"
+    },
+    {
+      "type": "kernel",
+      "key": " :  Kernel",
+      "keyColor": "38;5;44"
+    },
+    {
+      "type": "uptime",
+      "key": " :  Uptime",
+      "keyColor": "38;5;44"
+    },
+    {
+      "type": "shell",
+      "key": " :  Shell",
+      "keyColor": "38;5;44"
+    },
+    {
+      "type": "custom",
+      "format": "\u001b[38;5;44m :                                        :\u001b[0m"
+    },
+    {
+      "type": "cpu",
+      "key": " :  CPU",
+      "keyColor": "38;5;44"
+    },
+    {
+      "type": "gpu",
+      "key": " :  GPU",
+      "keyColor": "38;5;44"
+    },
+    {
+      "type": "memory",
+      "key": " :  Memory",
+      "keyColor": "38;5;44"
+    },
+    {
+      "type": "disk",
+      "key": " :  Disk",
+      "keyColor": "38;5;44"
+    },
+    {
+      "type": "display",
+      "key": " :  Display",
+      "keyColor": "38;5;44"
+    },
+    {
+      "type": "custom",
+      "format": "\u001b[38;5;44m :                                        :\u001b[0m"
+    },
+    {
+      "type": "localip",
+      "key": " :  Local",
+      "keyColor": "38;5;44"
+    },
+    {
+      "type": "publicip",
+      "key": " :  Public",
+      "keyColor": "38;5;44"
+    },
+    {
+      "type": "custom",
+      "format": "\u001b[38;5;44m `----------------------------------------'\u001b[0m"
+    },
+    "break"
+  ]
+}

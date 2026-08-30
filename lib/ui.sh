@@ -88,22 +88,22 @@ prompt_yes_no() {
   done
 }
 
-choose_neofetch_style() {
+choose_fastfetch_style() {
   local __out_var=$1
   local preset=""
   local selection=""
 
   if (( ! INTERACTIVE )); then
-    preset=${NEOFETCH_STYLE:-}
+    preset=${FASTFETCH_STYLE:-}
     preset=$(echo "$preset" | tr '[:upper:]' '[:lower:]')
     case "$preset" in
       boxed|minimal)
-        selection="config-boxed.conf"
+        selection="config-boxed.jsonc"
         ;;
       vaporwave|classic|"")
-        selection="config-vaporwave.conf"
+        selection="config-vaporwave.jsonc"
         ;;
-      *) error "Unknown NEOFETCH_STYLE '$preset'; expected 'vaporwave' or 'boxed'."; exit 1 ;;
+      *) error "Unknown FASTFETCH_STYLE '$preset'; expected 'vaporwave' or 'boxed'."; exit 1 ;;
     esac
     printf -v "$__out_var" '%s' "$selection"
     return
@@ -116,10 +116,10 @@ choose_neofetch_style() {
   local orange=$'\033[38;5;209m'
   local green=$'\033[38;5;85m'
   local teal=$'\033[38;5;44m'
-  # shellcheck disable=SC2034  # reserved for a future neofetch palette entry
+  # shellcheck disable=SC2034  # reserved for a future fastfetch palette entry
   local dark_teal=$'\033[38;5;24m'
 
-  printf '\nNeofetch style options:\n' >&"$PROMPT_FD"
+  printf '\nfastfetch style options:\n' >&"$PROMPT_FD"
   printf '  [1] Vaporwave – colorful with ◆ diamonds and 【】 headers\n' >&"$PROMPT_FD"
   printf '      %s◆%s User  %s◆%s OS  %s◆%s Host  %s【%sHARDWARE%s】%s\n' \
     "$pink" "$reset" "$cyan" "$reset" "$purple" "$reset" "$pink" "$cyan" "$pink" "$reset" >&"$PROMPT_FD"
@@ -129,8 +129,8 @@ choose_neofetch_style() {
 
   local choice
   while true; do
-    if ! printf 'Select neofetch style [1-2] (default: 1): ' >&"$PROMPT_FD"; then
-      error "Failed to display neofetch style question."
+    if ! printf 'Select fastfetch style [1-2] (default: 1): ' >&"$PROMPT_FD"; then
+      error "Failed to display fastfetch style question."
       exit 1
     fi
     if ! IFS= read -r -u "$PROMPT_FD" choice; then
@@ -139,8 +139,8 @@ choose_neofetch_style() {
     fi
     choice=${choice:-1}
     case "$choice" in
-      1) selection="config-vaporwave.conf"; break ;;
-      2) selection="config-boxed.conf"; break ;;
+      1) selection="config-vaporwave.jsonc"; break ;;
+      2) selection="config-boxed.jsonc"; break ;;
       *) printf 'Please enter 1 or 2.\n' >&"$PROMPT_FD" ;;
     esac
   done

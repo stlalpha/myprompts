@@ -33,6 +33,15 @@ Vaporwave-themed shell prompt system with automated configuration and package in
 - Installer filters packages by detected platform and package manager availability
 - Config files are sourced by Bash during installation (not parsed as data)
 
+### System Info Tool
+- `fastfetch` replaced `neofetch` (archived upstream 2024, delisted from every
+  targeted package manager). Configs are JSONC, not neofetch's Bash-sourced
+  `config.conf`.
+- ASCII logo color placeholders are fastfetch's `$1`/`$2`, not neofetch's
+  `${c1}`/`${c2}`. `tools/scale_ascii.py` reads that same syntax.
+- Installed to `~/.config/fastfetch/config.jsonc`; layout chosen by
+  `choose_fastfetch_style` (`FASTFETCH_STYLE=vaporwave|boxed`).
+
 ### Mac App Store Integration
 - Uses `mas` CLI tool via Ansible's `community.general.mas` module
 - `mas account` is broken on macOS 12+ due to Apple framework changes

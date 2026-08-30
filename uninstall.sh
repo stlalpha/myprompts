@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Reverses install.sh. Removes the sentinel-marked blocks it wrote, deletes the
-# install root, and restores any neofetch config it displaced.
+# install root, and restores any fastfetch config it displaced.
 
 INSTALL_ROOT=${INSTALL_ROOT:-"$HOME/.local/share/myprompts"}
 
@@ -51,17 +51,17 @@ strip_block() {
   info "Removed '$name' block from ${file/#$HOME/~}"
 }
 
-restore_neofetch() {
-  local target="$HOME/.config/neofetch/config.conf"
+restore_fastfetch() {
+  local target="$HOME/.config/fastfetch/config.jsonc"
   local backup="$target.myprompts-backup"
   if [[ -f $backup ]]; then
     mv "$backup" "$target"
-    info "Restored neofetch config from backup"
+    info "Restored fastfetch config from backup"
   elif [[ -f $target ]]; then
     rm -f "$target"
-    info "Removed the neofetch config written by myprompts"
+    info "Removed the fastfetch config written by myprompts"
   fi
-  rm -f "$HOME/.config/neofetch/signalmine.txt"
+  rm -f "$HOME/.config/fastfetch/signalmine.txt"
 }
 
 main() {
@@ -73,7 +73,7 @@ main() {
     done
   done
 
-  restore_neofetch
+  restore_fastfetch
 
   if [[ -d $INSTALL_ROOT ]]; then
     rm -rf "$INSTALL_ROOT"

@@ -95,10 +95,20 @@ shellcheck --shell=bash vaporwave_bash_prompt
 ```
 
 ### Test Suite
+`run_tests.sh` aggregates every suite and is what CI runs. Prefer it; the
+individual suites are for iterating on one area.
 ```bash
-bash test_installer.sh    # Installer test suite
-bash test_appstore.sh     # App Store integration tests
+./run_tests.sh            # everything (this is what CI runs)
+
+bash test_prompts.sh      # Bash prompt behaviour, incl. bash 3.2 regressions
+bash test_zsh_prompt.sh   # Zsh prompt
+bash test_themes.sh       # theme palettes and colour rendering
+bash test_installer.sh    # installer, incl. set -u compliance
+bash test_uninstall.sh    # uninstall round trips and rc-block safety
+bash test_appstore.sh     # Mac App Store integration
 ```
+`test_prompts.sh` honours `BASH32=/path/to/bash` so the suite can be pointed at
+a bash 5.x build locally to reproduce what CI sees on Linux.
 
 ## Coding Standards
 

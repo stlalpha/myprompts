@@ -377,11 +377,12 @@ test_fastfetch_configs_parse() {
 # actually rectangular -- every box row the same display width, closed at both
 # ends -- because a drift in the width maths shows up as a ragged right edge.
 test_boxfetch_draws_a_closed_box() {
-    test_start "boxfetch draws a rectangular closed box"
+    # test_skip does not resolve a started test, so guard before test_start.
     if ! command -v fastfetch >/dev/null 2>&1; then
         test_skip "boxfetch draws a rectangular closed box" "fastfetch not installed"
         return
     fi
+    test_start "boxfetch draws a rectangular closed box"
 
     local out
     if ! out=$(BOXFETCH_CONFIG="$PWD/fastfetch/config-boxed.jsonc" \

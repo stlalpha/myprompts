@@ -5,25 +5,33 @@ on:
     branches: [main]
   pull_request:
 
+# Neither job writes to the repo; the default can be broader depending on
+# org/repo settings, so state the minimum explicitly.
+permissions:
+  contents: read
+
 jobs:
   shellcheck:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - name: Install shellcheck
         run: sudo apt-get update && sudo apt-get install -y shellcheck
       - name: Lint (default severity)
         run: |
           # install.sh and lib/*.sh must be linted together: install.sh
-          # sources the lib/ modules via a runtime-computed path, so
-          # shellcheck can only resolve the cross-file globals (VW_*,
-          # pending_*, INTERACTIVE, etc.) when both sides are passed in the
-          # same invocation.
+          # sources the lib/ modules via a runtime-computed path, so the
+          # linter can only resolve the cross-file globals (VW_*, pending_*,
+          # INTERACTIVE, etc.) when both sides are passed in the same
+          # invocation. Do not start a comment line with the word
+          # "shellcheck" -- it is parsed as a directive (SC1073/SC1072).
           shellcheck install.sh uninstall.sh run_tests.sh vaporwave_ls_setup.sh \
                      config/*.sh themes/*.sh lib/*.sh test_*.sh
           # Prompts are sourced, not executed; tell shellcheck which shell.
           shellcheck --shell=bash vaporwave_bash_prompt
-          # vaporwave_zsh_prompt is intentionally NOT linted: shellcheck has
+          # vaporwave_zsh_prompt is intentionally NOT linted: the linter has
           # no zsh support and would misparse zsh-only syntax.
 
   test:
@@ -34,6 +42,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - name: Record bash version
         run: /bin/bash --version | head -1
       - name: Run suite

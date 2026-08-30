@@ -172,19 +172,19 @@ test_uninstall_removes_install_root() {
     rm -rf "$T"
 }
 
-test_uninstall_restores_neofetch_backup() {
-    test_start "uninstall restores the neofetch config from backup"
+test_uninstall_restores_fastfetch_backup() {
+    test_start "uninstall restores the fastfetch config from backup"
     local T; T=$(mktemp -d)
     local repo="$PWD"
-    mkdir -p "$T/.config/neofetch"
-    printf 'ORIGINAL\n' > "$T/.config/neofetch/config.conf"
+    mkdir -p "$T/.config/fastfetch"
+    printf 'ORIGINAL\n' > "$T/.config/fastfetch/config.jsonc"
     ( cd "$repo" && HOME="$T" INSTALL_ROOT="$T/ir" \
         MYPROMPTS_NONINTERACTIVE=1 PROMPT_STYLE=compact SHELL=/bin/bash \
         bash ./install.sh >/dev/null 2>&1 ) || true
     ( cd "$repo" && HOME="$T" INSTALL_ROOT="$T/ir" MYPROMPTS_NONINTERACTIVE=1 \
         bash ./uninstall.sh >/dev/null 2>&1 ) || true
-    assert_eq "ORIGINAL" "$(cat "$T/.config/neofetch/config.conf" 2>/dev/null)" "restored config"
-    local backup="$T/.config/neofetch/config.conf.myprompts-backup"
+    assert_eq "ORIGINAL" "$(cat "$T/.config/fastfetch/config.jsonc" 2>/dev/null)" "restored config"
+    local backup="$T/.config/fastfetch/config.jsonc.myprompts-backup"
     if [ -f "$backup" ]; then
         test_fail "backup file still exists after restore"
     fi
@@ -212,6 +212,6 @@ test_uninstall_preserves_trailing_blank_line_byte_identical
 test_uninstall_preserves_foreign_lines_before_and_after_blocks
 test_uninstall_preserves_rc_permissions
 test_uninstall_removes_install_root
-test_uninstall_restores_neofetch_backup
+test_uninstall_restores_fastfetch_backup
 test_uninstall_idempotent_on_clean_system
 test_summary

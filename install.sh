@@ -138,23 +138,23 @@ main() {
   mkdir -p "$INSTALL_ROOT/lib"
   install -m 644 "$MYPROMPTS_SRC/lib/prompt_common.sh" "$INSTALL_ROOT/lib/prompt_common.sh"
 
-  info "Installing neofetch configuration"
-  mkdir -p "$HOME/.config/neofetch"
-  mkdir -p "$INSTALL_ROOT/neofetch"
-  install -m 644 "$MYPROMPTS_SRC/neofetch/config-vaporwave.conf" "$INSTALL_ROOT/neofetch/config-vaporwave.conf"
-  install -m 644 "$MYPROMPTS_SRC/neofetch/config-boxed.conf" "$INSTALL_ROOT/neofetch/config-boxed.conf"
-  install -m 644 "$MYPROMPTS_SRC/neofetch/signalmine.txt" "$HOME/.config/neofetch/signalmine.txt"
-  local neofetch_style=""
-  choose_neofetch_style neofetch_style
-  info "Using $neofetch_style for neofetch"
-  local neofetch_target="$HOME/.config/neofetch/config.conf"
-  local neofetch_backup="$neofetch_target.myprompts-backup"
-  if [[ -f $neofetch_target && ! -f $neofetch_backup ]]; then
-    info "Backing up existing neofetch config to ${neofetch_backup/#$HOME/~}"
-    mv "$neofetch_target" "$neofetch_backup"
+  info "Installing fastfetch configuration"
+  mkdir -p "$HOME/.config/fastfetch"
+  mkdir -p "$INSTALL_ROOT/fastfetch"
+  install -m 644 "$MYPROMPTS_SRC/fastfetch/config-vaporwave.jsonc" "$INSTALL_ROOT/fastfetch/config-vaporwave.jsonc"
+  install -m 644 "$MYPROMPTS_SRC/fastfetch/config-boxed.jsonc" "$INSTALL_ROOT/fastfetch/config-boxed.jsonc"
+  install -m 644 "$MYPROMPTS_SRC/fastfetch/signalmine.txt" "$HOME/.config/fastfetch/signalmine.txt"
+  local fastfetch_style=""
+  choose_fastfetch_style fastfetch_style
+  info "Using $fastfetch_style for fastfetch"
+  local fastfetch_target="$HOME/.config/fastfetch/config.jsonc"
+  local fastfetch_backup="$fastfetch_target.myprompts-backup"
+  if [[ -f $fastfetch_target && ! -f $fastfetch_backup ]]; then
+    info "Backing up existing fastfetch config to ${fastfetch_backup/#$HOME/~}"
+    mv "$fastfetch_target" "$fastfetch_backup"
   fi
-  cp "$INSTALL_ROOT/neofetch/$neofetch_style" "$neofetch_target"
-  chmod 644 "$neofetch_target"
+  cp "$INSTALL_ROOT/fastfetch/$fastfetch_style" "$fastfetch_target"
+  chmod 644 "$fastfetch_target"
 
   printf 'installed %s\n' "$(date -u +%FT%TZ)" >"$INSTALL_ROOT/.install-meta"
 

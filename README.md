@@ -8,6 +8,7 @@ Vaporwave-themed shell prompts with automated system configuration.
 - Static prompt variants for Bash and Zsh
 - Custom LS colors matching the vaporwave aesthetic
 - Automated package installation via Ansible
+- fastfetch system-info layouts with a Signal Mine ASCII logo
 - Mac App Store app installation support (macOS)
 - Cross-platform support (macOS, Linux)
 
@@ -127,6 +128,9 @@ source vaporwave_ls_setup.sh
 ├── themes/                     # Theme palettes (signalmine, vaporwave, ember)
 ├── lib/
 │   └── prompt_common.sh        # Shared prompt helpers (theme, git, duration)
+├── fastfetch/                  # fastfetch configs + Signal Mine ASCII logo
+├── tools/
+│   └── scale_ascii.py          # Rescales the ASCII logo, preserving colors
 ├── config/
 │   ├── packages.sh             # Package definitions
 │   └── aliases.sh              # Alias definitions
@@ -162,6 +166,7 @@ trap keeps working and no duration is shown. Upgrading to a current Bash
 - `MYPROMPTS_GIT` - Set to `0` to disable the git segment
 - `MYPROMPTS_DURATION_MIN` - Seconds before a command duration is shown (default `5`)
 - `PROMPT_STYLE` - Pre-select style: `compact` or `extended`
+- `FASTFETCH_STYLE` - Pre-select fastfetch layout: `vaporwave` or `boxed`
 
 ## Testing
 
@@ -181,3 +186,17 @@ SHELL=/bin/bash bash ./install.sh
 ## Contributing
 
 See AGENTS.md for development guidelines.
+## System Info (fastfetch)
+
+The installer writes a `fastfetch` config to `~/.config/fastfetch/config.jsonc`
+and the Signal Mine ASCII logo alongside it. Two layouts ship:
+
+- `vaporwave` (default) - colored `◆` keys with `【HARDWARE】` / `【NETWORK】` section headers
+- `boxed` - minimal cyan/teal layout inside a `.---.` border
+
+Pick one non-interactively with `FASTFETCH_STYLE=boxed`. An existing config is
+moved to `config.jsonc.myprompts-backup` before the first overwrite, and
+`uninstall.sh` puts it back.
+
+This replaces neofetch, which was archived upstream in 2024 and has since been
+dropped by Homebrew, apt, dnf and pacman.

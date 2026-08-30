@@ -12,7 +12,7 @@ macos_brew_formulae=(
   gh
   nmap
   netcat
-  neofetch
+  fastfetch
 )
 
 macos_brew_casks=(
@@ -34,18 +34,18 @@ macos_appstore_apps=(
 linux_apt_packages=(
   nmap
   netcat-openbsd
-  neofetch
+  fastfetch
 )
 
 linux_dnf_packages=(
   nmap
   nmap-ncat
-  neofetch
+  fastfetch
 )
 
 linux_pacman_packages=(
   nmap
-  neofetch
+  fastfetch
 )
 
 linux_paru_packages=(

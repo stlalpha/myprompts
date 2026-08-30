@@ -223,18 +223,56 @@ test_reinstall_flow() {
     cleanup_test_env
 }
 
-test_neofetch_config_backed_up() {
-    test_start "install backs up a pre-existing neofetch config"
+# Guard for the neofetch -> fastfetch migration: neofetch was archived
+# upstream in 2024 and is no longer packaged by Homebrew, apt, dnf or pacman,
+# so any surviving reference is a package install that fails. docs/ is
+# excluded: the historical plan and spec legitimately discuss neofetch.
+test_no_neofetch_references() {
+    test_start "no neofetch references remain outside docs/"
+    # Scope to tracked files: untracked scratch (agent run logs, local
+    # artifacts) is not shipped and must not fail the suite.
+    local hits
+    # This file is excluded because the guard names the very string it hunts.
+    hits=$(git ls-files -z | grep -zv '^docs/' | grep -zv '^test_installer\.sh$' \
+             | xargs -0 grep -Il neofetch 2>/dev/null || true)
+    if [[ -z $hits ]]; then
+        test_pass
+    else
+        test_fail "neofetch still referenced in: $(echo "$hits" | tr '\n' ' ')"
+    fi
+}
+
+# The shipped configs must actually parse. fastfetch validates its JSONC and
+# exits non-zero on a malformed config, which is the only check that proves
+# the neofetch -> fastfetch port produced something usable.
+test_fastfetch_configs_parse() {
+    if ! command -v fastfetch >/dev/null 2>&1; then
+        echo "Testing shipped fastfetch configs parse... SKIPPED (fastfetch not installed)"
+        return
+    fi
+    local cfg
+    for cfg in fastfetch/config-*.jsonc; do
+        test_start "fastfetch parses $(basename "$cfg")"
+        if fastfetch --config "$PWD/$cfg" --structure title --logo none >/dev/null 2>&1; then
+            test_pass
+        else
+            test_fail "fastfetch rejected $cfg: $(fastfetch --config "$PWD/$cfg" --structure title --logo none 2>&1 | head -3)"
+        fi
+    done
+}
+
+test_fastfetch_config_backed_up() {
+    test_start "install backs up a pre-existing fastfetch config"
     setup_test_env
-    mkdir -p "$HOME/.config/neofetch"
-    printf 'ORIGINAL\n' >"$HOME/.config/neofetch/config.conf"
+    mkdir -p "$HOME/.config/fastfetch"
+    printf 'ORIGINAL\n' >"$HOME/.config/fastfetch/config.jsonc"
 
     # setup_test_env exports MYPROMPTS_NONINTERACTIVE=1, and
     # handle_package_bootstrap returns early when INTERACTIVE is 0. So this
     # installs no packages. Do not add a skip flag; one is not needed.
     PROMPT_STYLE=compact bash ./install.sh >/dev/null 2>&1 || true
 
-    local backup="$HOME/.config/neofetch/config.conf.myprompts-backup"
+    local backup="$HOME/.config/fastfetch/config.jsonc.myprompts-backup"
     if [[ -f $backup ]] && [[ "$(cat "$backup")" == "ORIGINAL" ]]; then
         test_pass
     else
@@ -273,7 +311,9 @@ main() {
     test_bash_compatibility
     test_installer_noninteractive
     test_reinstall_flow
-    test_neofetch_config_backed_up
+    test_fastfetch_config_backed_up
+    test_no_neofetch_references
+    test_fastfetch_configs_parse
     test_shellcheck
 
     echo

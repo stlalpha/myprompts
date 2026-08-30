@@ -62,15 +62,36 @@ else
   fi
 fi
 
-# The bootstrap drops this file into the directory it creates. cleanup() will
-# not remove anything that lacks it, so a MYPROMPTS_TMP_SRC inherited from the
-# caller's environment can never cause an unrelated directory to be deleted.
+# The bootstrap writes a freshly generated token into this file inside the
+# directory it creates, and passes the same token to its re-exec'd child.
+# cleanup() removes a directory only when the token inside it matches, so
+# neither an unrelated MYPROMPTS_TMP_SRC inherited from the caller's
+# environment nor a stale directory left by an earlier bootstrap can be
+# deleted. Shape alone is not proof of ownership: a killed bootstrap leaves a
+# directory with the same basename pattern and the same sentinel file.
 MYPROMPTS_TMP_SENTINEL=.myprompts-bootstrap
+
+myprompts_new_tmp_token() {
+  local token=""
+  if [[ -r /dev/urandom ]]; then
+    token=$(od -An -tx1 -N16 /dev/urandom 2>/dev/null | tr -d ' \n')
+  fi
+  # Fallback for a system without a readable /dev/urandom. Weaker, but this
+  # only has to be unguessable enough that a stale directory never matches.
+  [[ -n $token ]] || token="$$-${RANDOM}-${RANDOM}-$(date +%s 2>/dev/null)"
+  printf '%s' "$token"
+}
 
 myprompts_tmp_is_ours() {
   local dir=${1:-}
   [[ -n $dir && -d $dir ]] || return 1
-  [[ -f "$dir/$MYPROMPTS_TMP_SENTINEL" ]] || return 1
+  [[ -n ${MYPROMPTS_TMP_TOKEN:-} ]] || return 1
+  local sentinel="$dir/$MYPROMPTS_TMP_SENTINEL"
+  [[ -f $sentinel ]] || return 1
+  local recorded=""
+  IFS= read -r recorded < "$sentinel" 2>/dev/null || return 1
+  [[ $recorded == "$MYPROMPTS_TMP_TOKEN" ]] || return 1
+  # Structural guard, kept as a second line of defence.
   case "${dir##*/}" in
     myprompts.??????) return 0 ;;
     *) return 1 ;;
@@ -109,7 +130,7 @@ myprompts_bootstrap() {
     # via the adjacent lib/ but whose inherited value is the tree it must
     # clean up. The sentinel tells them apart.
     if ! myprompts_tmp_is_ours "${MYPROMPTS_TMP_SRC:-}"; then
-      unset MYPROMPTS_TMP_SRC
+      unset MYPROMPTS_TMP_SRC MYPROMPTS_TMP_TOKEN
     fi
     return 0
   fi
@@ -121,13 +142,17 @@ myprompts_bootstrap() {
   tmp_base=${TMPDIR:-/tmp}
   tmp_base=${tmp_base%/}
   tmp=$(mktemp -d "$tmp_base/myprompts.XXXXXX")
-  # Mark it as ours before anything else can fail. cleanup() removes only
-  # directories carrying this sentinel, so an inherited MYPROMPTS_TMP_SRC
-  # pointing at unrelated data is never touched.
-  : > "$tmp/$MYPROMPTS_TMP_SENTINEL"
+  # Mark it as ours before anything else can fail: a token this process just
+  # generated, recorded inside the directory and handed to the child. cleanup()
+  # deletes only on an exact match, so neither an unrelated inherited path nor
+  # a stale directory from a previous run can be removed.
+  local token
+  token=$(myprompts_new_tmp_token)
+  printf '%s\n' "$token" > "$tmp/$MYPROMPTS_TMP_SENTINEL"
   # Export before the fetch, not after: if the curl | tar pipeline fails, the
   # EXIT trap still knows what to clean up.
   export MYPROMPTS_TMP_SRC=$tmp
+  export MYPROMPTS_TMP_TOKEN=$token
   echo "Fetching myprompts..."
   # /archive/<ref>.tar.gz resolves a branch, a tag or a commit SHA. The
   # /archive/refs/heads/<ref>.tar.gz form this used to build only resolves

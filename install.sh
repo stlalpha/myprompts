@@ -66,6 +66,11 @@ cleanup() {
   if [[ $TTY_FD_OPENED -eq 1 ]]; then
     exec 3>&-
   fi
+  # Set only when this process was re-exec'd out of a fetched tarball. By the
+  # time the trap runs the install has copied everything it needs out of it.
+  if [[ -n ${MYPROMPTS_TMP_SRC:-} && -d ${MYPROMPTS_TMP_SRC:-} ]]; then
+    rm -rf "$MYPROMPTS_TMP_SRC"
+  fi
 }
 
 trap cleanup EXIT
@@ -86,12 +91,25 @@ myprompts_bootstrap() {
     return 0
   fi
 
-  local tmp
-  tmp=$(mktemp -d)
+  local tmp tmp_base
+  # A bare `mktemp -d` ignores TMPDIR on macOS (it uses the Darwin per-user
+  # temp dir), which makes the location unpredictable and the cleanup
+  # untestable. Give it an explicit template so both platforms agree.
+  tmp_base=${TMPDIR:-/tmp}
+  tmp_base=${tmp_base%/}
+  tmp=$(mktemp -d "$tmp_base/myprompts.XXXXXX")
   echo "Fetching myprompts..."
-  curl -fsSL "$MYPROMPTS_REPO/archive/refs/heads/$MYPROMPTS_REF.tar.gz" \
+  # /archive/<ref>.tar.gz resolves a branch, a tag or a commit SHA. The
+  # /archive/refs/heads/<ref>.tar.gz form this used to build only resolves
+  # branches, so MYPROMPTS_REF=<tag|sha> 404'd.
+  curl -fsSL "$MYPROMPTS_REPO/archive/$MYPROMPTS_REF.tar.gz" \
     | tar -xz -C "$tmp" --strip-components=1
   MYPROMPTS_SRC=$tmp
+  # exec replaces this process, so its EXIT trap never runs and the extracted
+  # tree would leak. Hand the path to the child, whose cleanup() removes it.
+  # The child is whichever version MYPROMPTS_REF names, so fetching a ref older
+  # than this change still leaks -- nothing this side can do about that.
+  export MYPROMPTS_TMP_SRC=$tmp
   exec bash "$tmp/install.sh" "$@"
 }
 

@@ -369,11 +369,30 @@ test_debug_trap_double_source_no_recursion() {
 # must fork exactly once per draw (the sanctioned mp_git_segment/git status
 # call). Any other "$(" appearing in the function body would reintroduce a
 # gratuitous subprocess.
+# `((x = a - b))` returns status 1 when the result is 0, so an arithmetic
+# *command* on the elapsed-time line made myprompts_build_ps1's own status
+# depend on whether the last command took zero seconds.
+test_build_ps1_returns_success() {
+    test_start "myprompts_build_ps1 returns success when elapsed is zero"
+    local status
+    # shellcheck disable=SC2016 # single-quoted: expands inside the nested bash, not here
+    status=$("$BASH32" -c '
+        source ./vaporwave_bash_prompt >/dev/null 2>&1
+        myprompts_timer=$SECONDS
+        myprompts_build_ps1 >/dev/null 2>&1
+        printf %s "$?"' 2>&1)
+    assert_eq "0" "$status" "exit status of myprompts_build_ps1"
+}
+
 test_build_ps1_single_command_substitution() {
     test_start "myprompts_build_ps1 contains exactly one command substitution"
     local count
+    # Match '$(' but NOT '$((': arithmetic expansion forks nothing, and
+    # counting it forced the code into the `(( ))` arithmetic *command* form,
+    # which returns status 1 whenever its result is 0. Guard the fork, not the
+    # punctuation.
     # shellcheck disable=SC2016 # single-quoted grep pattern is a literal '$(', not an expansion
-    count=$(awk '/^myprompts_build_ps1\(\)/,/^}/' vaporwave_bash_prompt | grep -c '\$(')
+    count=$(awk '/^myprompts_build_ps1\(\)/,/^}/' vaporwave_bash_prompt | grep -c '\$([^(]')
     assert_eq "1" "$count" "command substitution count in myprompts_build_ps1"
 }
 
@@ -389,6 +408,7 @@ test_timer_arms_without_pre_existing_trap
 test_debug_trap_empty_previous
 test_debug_trap_single_quote_previous
 test_debug_trap_double_source_no_recursion
+test_build_ps1_returns_success
 test_build_ps1_single_command_substitution
 
 test_summary

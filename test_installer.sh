@@ -219,6 +219,58 @@ test_reinstall_flow() {
 # lib modules, playbook. Prose that explains the migration (README, CLAUDE.md,
 # the header comments in the ported configs, docs/) is deliberately out of
 # scope: describing what was replaced is not the same as still calling it.
+# The bootstrap path (curl | bash) is otherwise only covered by manual runs.
+# curl speaks file://, so a local tarball exercises fetch + re-exec with no
+# network: MYPROMPTS_REPO becomes a file:// base and the tarball is placed at
+# the exact path the installer builds.
+make_bootstrap_fixture() {
+    local dir=$1
+    mkdir -p "$dir/archive"
+    # Name the tarball after a SHA-shaped ref, not a branch. If the installer
+    # still builds ".../archive/refs/heads/<ref>.tar.gz" the fetch 404s, which
+    # is the bug: tags and commit SHAs live at different paths and only the
+    # generic /archive/<ref>.tar.gz form resolves for all three.
+    tar -czf "$dir/archive/deadbeefcafe.tar.gz" \
+        --exclude='.git' --exclude='./.git' \
+        -s '/^\./myprompts-deadbeefcafe/' . 2>/dev/null ||
+    tar -czf "$dir/archive/deadbeefcafe.tar.gz" \
+        --exclude='.git' --transform 's,^\./,myprompts-deadbeefcafe/,' . 2>/dev/null
+}
+
+test_bootstrap_fetches_non_branch_ref_and_cleans_up() {
+    test_start "bootstrap resolves a non-branch ref and removes its temp dir"
+    local T fixture tmphome tmpdir
+    T=$(mktemp -d); fixture="$T/fixture"; tmphome="$T/home"; tmpdir="$T/tmp"
+    mkdir -p "$fixture" "$tmphome" "$tmpdir"
+
+    if ! make_bootstrap_fixture "$fixture"; then
+        test_fail "could not build the bootstrap tarball fixture"
+        rm -rf "$T"; return
+    fi
+
+    # Pipe install.sh on stdin so BASH_SOURCE is unset and the bootstrap takes
+    # the fetch-and-re-exec path rather than using the adjacent lib/.
+    local rc=0
+    env -i PATH="$PATH" HOME="$tmphome" TMPDIR="$tmpdir" SHELL=/bin/bash \
+        MYPROMPTS_NONINTERACTIVE=1 PROMPT_STYLE=compact \
+        INSTALL_ROOT="$tmphome/ir" \
+        MYPROMPTS_REPO="file://$fixture" MYPROMPTS_REF=deadbeefcafe \
+        bash < install.sh >/dev/null 2>&1 || rc=$?
+
+    if [[ $rc -ne 0 ]]; then
+        test_fail "bootstrap install failed (rc=$rc); the non-branch ref did not resolve"
+        rm -rf "$T"; return
+    fi
+    if [[ ! -f "$tmphome/ir/vaporwave_bash_prompt" ]]; then
+        test_fail "bootstrap install did not place the prompt files"
+        rm -rf "$T"; return
+    fi
+    local leftover
+    leftover=$(find "$tmpdir" -mindepth 1 -maxdepth 1 2>/dev/null | wc -l | tr -d ' ')
+    rm -rf "$T"
+    assert_eq "0" "$leftover" "temp directories left behind by the bootstrap"
+}
+
 test_no_neofetch_references() {
     test_start "no neofetch references remain in the executable surface"
     local hits
@@ -304,6 +356,7 @@ main() {
     test_installer_noninteractive
     test_reinstall_flow
     test_fastfetch_config_backed_up
+    test_bootstrap_fetches_non_branch_ref_and_cleans_up
     test_no_neofetch_references
     test_fastfetch_configs_parse
     test_shellcheck

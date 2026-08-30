@@ -92,7 +92,7 @@ myprompts_build_ps1() {
 
     local elapsed=0
     if [ -n "${myprompts_timer:-}" ]; then
-        ((elapsed = SECONDS - myprompts_timer))
+        elapsed=$((SECONDS - myprompts_timer))
     fi
     unset myprompts_timer
 

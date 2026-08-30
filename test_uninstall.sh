@@ -4,10 +4,18 @@ cd "$(dirname "$0")" || exit 1
 # shellcheck disable=SC1091 # test_helpers.sh is committed alongside this script
 source ./test_helpers.sh
 
-# Portable octal permission bits: BSD/macOS stat and GNU/Linux stat take
-# different flags, so try both.
+# Portable octal permission bits. BSD/macOS uses `stat -f FORMAT`, GNU uses
+# `stat -c FORMAT` -- and the two collide badly: on GNU, `-f` means "show
+# filesystem status" and '%Lp' is parsed as a FILENAME, so `stat -f '%Lp' file`
+# prints a filesystem dump for the real file and exits non-zero for the bogus
+# one. A `BSD || GNU` chain therefore returns the dump *and* the mode
+# concatenated. Probe GNU first, since its failure on BSD is clean.
 rc_mode() {
-    stat -f '%Lp' "$1" 2>/dev/null || stat -c '%a' "$1"
+    if stat -c '%a' "$1" >/dev/null 2>&1; then
+        stat -c '%a' "$1"
+    else
+        stat -f '%Lp' "$1"
+    fi
 }
 
 # install.sh / uninstall.sh must succeed. Masking their exit status with
@@ -25,6 +33,23 @@ run_uninstall() {
     local home=$1; shift
     ( cd "$PWD" && HOME="$home" INSTALL_ROOT="$home/ir" MYPROMPTS_NONINTERACTIVE=1 \
         bash ./uninstall.sh >/dev/null 2>&1 )
+}
+
+# Guard for the helper itself. A broken rc_mode does not fail loudly -- it
+# returns garbage, and the permission tests then compare garbage to garbage and
+# pass. That is exactly what happened on Linux, where `stat -f '%Lp' file`
+# parsed '%Lp' as a filename and emitted a filesystem dump.
+test_rc_mode_returns_plain_octal() {
+    test_start "rc_mode returns a plain octal mode"
+    local T; T=$(mktemp -d)
+    : > "$T/probe"
+    chmod 644 "$T/probe"
+    local mode; mode=$(rc_mode "$T/probe")
+    rm -rf "$T"
+    case "$mode" in
+        644) test_pass ;;
+        *) test_fail "rc_mode is not reporting octal modes on this platform: '$(printf '%s' "$mode" | tr '\n' '|')'" ;;
+    esac
 }
 
 test_uninstall_restores_rc_files_byte_identical() {
@@ -422,6 +447,7 @@ test_uninstall_idempotent_on_clean_system() {
     rm -rf "$T"
 }
 
+test_rc_mode_returns_plain_octal
 test_uninstall_restores_rc_files_byte_identical
 test_uninstall_preserves_trailing_blank_line_byte_identical
 test_uninstall_preserves_foreign_lines_before_and_after_blocks

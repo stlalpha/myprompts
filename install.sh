@@ -82,16 +82,41 @@ myprompts_new_tmp_token() {
   printf '%s' "$token"
 }
 
+# Set only by this process, never inherited: reset before the trap is armed so
+# an exported variable of the same name from the caller cannot seed it. This is
+# how the bootstrap parent remembers a directory it created but has not yet
+# exec'd out of -- the case where the fetch fails.
+MYPROMPTS_TMP_CREATED=""
+
+# Ownership for the re-exec'd child. The token alone is not enough: it travels
+# through the environment, so a caller can supply a matching MYPROMPTS_TMP_SRC,
+# MYPROMPTS_TMP_TOKEN and sentinel together and satisfy every check. The proof
+# that cannot be forged from the environment is location -- the script this
+# process is executing must itself live inside the directory being removed.
+# Getting that to hold means actually running install.sh from inside the
+# directory, which is what a real bootstrap child does and what nobody does by
+# accident.
 myprompts_tmp_is_ours() {
   local dir=${1:-}
   [[ -n $dir && -d $dir ]] || return 1
+
+  local self=""
+  if [[ -n ${BASH_SOURCE[0]:-} && -f ${BASH_SOURCE[0]} ]]; then
+    self=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd 2>/dev/null) || self=""
+  fi
+  [[ -n $self ]] || return 1
+  local resolved
+  resolved=$(cd "$dir" && pwd 2>/dev/null) || return 1
+  [[ $self == "$resolved" ]] || return 1
+
   [[ -n ${MYPROMPTS_TMP_TOKEN:-} ]] || return 1
   local sentinel="$dir/$MYPROMPTS_TMP_SENTINEL"
   [[ -f $sentinel ]] || return 1
   local recorded=""
   IFS= read -r recorded < "$sentinel" 2>/dev/null || return 1
   [[ $recorded == "$MYPROMPTS_TMP_TOKEN" ]] || return 1
-  # Structural guard, kept as a second line of defence.
+
+  # Structural guard, kept as a further line of defence.
   case "${dir##*/}" in
     myprompts.??????) return 0 ;;
     *) return 1 ;;
@@ -102,9 +127,12 @@ cleanup() {
   if [[ $TTY_FD_OPENED -eq 1 ]]; then
     exec 3>&-
   fi
-  # Set only when this process was re-exec'd out of a fetched tarball. By the
-  # time the trap runs the install has copied everything it needs out of it.
-  if myprompts_tmp_is_ours "${MYPROMPTS_TMP_SRC:-}"; then
+  # Either this process created the directory and never exec'd out of it (a
+  # failed fetch), or it is the re-exec'd child running from inside it. By the
+  # time the trap runs the install has copied out everything it needs.
+  if [[ -n $MYPROMPTS_TMP_CREATED && -d $MYPROMPTS_TMP_CREATED ]]; then
+    rm -rf "$MYPROMPTS_TMP_CREATED"
+  elif myprompts_tmp_is_ours "${MYPROMPTS_TMP_SRC:-}"; then
     rm -rf "$MYPROMPTS_TMP_SRC"
   fi
 }
@@ -149,6 +177,9 @@ myprompts_bootstrap() {
   local token
   token=$(myprompts_new_tmp_token)
   printf '%s\n' "$token" > "$tmp/$MYPROMPTS_TMP_SENTINEL"
+  # Remember it in process-local state so a failed fetch is still cleaned up
+  # without relying on anything that came from the environment.
+  MYPROMPTS_TMP_CREATED=$tmp
   # Export before the fetch, not after: if the curl | tar pipeline fails, the
   # EXIT trap still knows what to clean up.
   export MYPROMPTS_TMP_SRC=$tmp

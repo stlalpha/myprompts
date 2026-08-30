@@ -315,6 +315,30 @@ test_stale_bootstrap_dir_is_not_deleted() {
     assert_eq "yes" "$survived" "stale bootstrap directory survived the install"
 }
 
+# The token is passed through the environment, so a caller can supply a
+# matching MYPROMPTS_TMP_SRC, MYPROMPTS_TMP_TOKEN and sentinel together and
+# satisfy every check. Ownership has to rest on something the caller cannot
+# fabricate: whether this process is actually running from inside that
+# directory.
+test_forged_token_does_not_authorise_deletion() {
+    test_start "a caller-forged token does not authorise deletion"
+    local T; T=$(mktemp -d)
+    local forged="$T/myprompts.abcdef"
+    mkdir -p "$forged" "$T/home"
+    printf 'forged-token-value\n' > "$forged/.myprompts-bootstrap"
+    printf 'IRREPLACEABLE\n' > "$forged/data.txt"
+
+    env HOME="$T/home" INSTALL_ROOT="$T/home/ir" MYPROMPTS_NONINTERACTIVE=1 \
+        PROMPT_STYLE=compact SHELL=/bin/bash \
+        MYPROMPTS_TMP_SRC="$forged" MYPROMPTS_TMP_TOKEN=forged-token-value \
+        bash ./install.sh >/dev/null 2>&1 || true
+
+    local survived=no
+    [[ -f "$forged/data.txt" ]] && survived=yes
+    rm -rf "$T"
+    assert_eq "yes" "$survived" "caller-controlled directory survived"
+}
+
 test_no_neofetch_references() {
     test_start "no neofetch references remain in the executable surface"
     local hits
@@ -403,6 +427,7 @@ main() {
     test_bootstrap_fetches_non_branch_ref_and_cleans_up
     test_inherited_tmp_src_is_not_deleted
     test_stale_bootstrap_dir_is_not_deleted
+    test_forged_token_does_not_authorise_deletion
     test_no_neofetch_references
     test_fastfetch_configs_parse
     test_shellcheck

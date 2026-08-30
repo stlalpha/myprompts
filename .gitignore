@@ -1,0 +1,6 @@
+.code-graph/
+.beads/
+.claude/
+*.sqlite3
+pyghidra_mcp_projects/
+ansible_vars.yml

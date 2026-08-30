@@ -1,4 +1,10 @@
+#!/usr/bin/env bash
 # Package configuration for Spaceman's Auto-Personalizer
+
+# Every array below is this module's public interface, read by install.sh
+# after sourcing rather than by this script. A directive before the first
+# command is file-wide in shellcheck, which is exactly the intent here.
+# shellcheck disable=SC2034
 
 # macOS packages via Homebrew
 macos_brew_formulae=(

@@ -5,7 +5,7 @@ Vaporwave-themed shell prompts with automated system configuration.
 ## Features
 
 - Shell prompt themes for Bash and Zsh
-- Animated and static prompt variants
+- Static prompt variants for Bash and Zsh
 - Custom LS colors matching the vaporwave aesthetic
 - Automated package installation via Ansible
 - Mac App Store app installation support (macOS)
@@ -37,9 +37,6 @@ bash install.sh
 
 ### Classic Bash Prompt
 Static prompt with git branch detection.
-
-### Liquid Prompt
-Animated Bash prompt with wave effects.
 
 ### Zsh Prompt
 Zsh-native implementation with hooks.
@@ -93,10 +90,13 @@ For automated deployments:
 MYPROMPTS_NONINTERACTIVE=1 bash install.sh
 ```
 
+This skips all prompts and also skips package installation entirely — only the
+prompt files, LS colors, and shell configuration are installed.
+
 Pre-select options:
 
 ```bash
-PROMPT_VARIANT=liquid PROMPT_STYLE=extended bash install.sh
+PROMPT_STYLE=extended bash install.sh
 ```
 
 ## Manual Installation
@@ -106,9 +106,6 @@ Individual components can be sourced directly:
 ```bash
 # Bash prompt
 source vaporwave_bash_prompt
-
-# Liquid prompt
-source vaporwave_liquid_prompt
 
 # Zsh prompt
 source vaporwave_zsh_prompt
@@ -122,11 +119,14 @@ source vaporwave_ls_setup.sh
 
 ```
 ├── install.sh                  # Main installer
+├── uninstall.sh                # Reverses install.sh
 ├── vaporwave_bash_prompt       # Bash static prompt
-├── vaporwave_liquid_prompt     # Bash animated prompt
 ├── vaporwave_zsh_prompt        # Zsh prompt
 ├── vaporwave_lscolors          # LS_COLORS definitions
 ├── vaporwave_ls_setup.sh       # LS colors setup helper
+├── themes/                     # Theme palettes (signalmine, vaporwave, ember)
+├── lib/
+│   └── prompt_common.sh        # Shared prompt helpers (theme, git, duration)
 ├── config/
 │   ├── packages.sh             # Package definitions
 │   └── aliases.sh              # Alias definitions
@@ -134,19 +134,33 @@ source vaporwave_ls_setup.sh
     └── playbook.yml            # Package installation playbook
 ```
 
+## Command Duration
+
+The Bash prompt times each command and shows the elapsed seconds once it
+crosses `MYPROMPTS_DURATION_MIN`. On Bash 4.4+ it arms the timer through
+`PS0`, appending to any `PS0` you already set and leaving `DEBUG` traps
+untouched.
+
+Bash 3.2 (the macOS system Bash) has no `PS0`, so it falls back to a `DEBUG`
+trap. If you already have a `DEBUG` trap of your own, Bash 3.2 will not let a
+sourced file replace it, and a sourced file cannot read it either — so your
+trap keeps working and no duration is shown. Upgrading to a current Bash
+(`brew install bash`) removes the limitation.
+
 ## Requirements
 
 - Bash 3.2+ or Zsh
 - curl (for installation)
 - git (for branch detection in prompts)
 - 256-color terminal support (recommended)
-- Unicode support (for liquid prompt)
 
 ## Environment Variables
 
 - `MYPROMPTS_PROMPT_STYLE` - Set to `compact` or `extended`
 - `MYPROMPTS_NONINTERACTIVE` - Set to `1` for non-interactive mode
-- `PROMPT_VARIANT` - Pre-select variant: `bash`, `liquid`, or `zsh`
+- `MYPROMPTS_THEME` - Set to `signalmine` (default), `vaporwave`, or `ember`
+- `MYPROMPTS_GIT` - Set to `0` to disable the git segment
+- `MYPROMPTS_DURATION_MIN` - Seconds before a command duration is shown (default `5`)
 - `PROMPT_STYLE` - Pre-select style: `compact` or `extended`
 
 ## Testing
@@ -163,10 +177,6 @@ Test installer locally:
 HOME=$(mktemp -d) BASE_URL="file://$PWD" INSTALL_ROOT="$HOME/.myprompts" \
 SHELL=/bin/bash bash ./install.sh
 ```
-
-## License
-
-[License information to be added]
 
 ## Contributing
 

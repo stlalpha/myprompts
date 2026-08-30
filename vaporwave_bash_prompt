@@ -1,50 +1,178 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# Signal Mine / vaporwave Bash prompt.
+# Requires bash 3.2+ (the macOS system bash). No bash-4-only syntax.
+#
+#   MYPROMPTS_THEME         signalmine (default) | vaporwave
+#   MYPROMPTS_PROMPT_STYLE  compact (default) | extended
+#   MYPROMPTS_GIT           set to 0 to disable the git segment
+#   MYPROMPTS_DURATION_MIN  seconds; commands at least this long show a duration (default 5)
 
-# Vaporwave Dark Mode Bash Prompt
-# Colors inspired by 80s/90s aesthetics, neon lights, and synthwave
+[ -n "${BASH_VERSION:-}" ] || return 0
 
-# Color definitions (using 256-color codes for better compatibility)
-RESET='\[\033[0m\]'
-BOLD='\[\033[1m\]'
+myprompts_self=${BASH_SOURCE[0]}
+myprompts_root=$(cd "$(dirname "$myprompts_self")" && pwd)
+if [ -f "$myprompts_root/lib/prompt_common.sh" ]; then
+    # shellcheck source=/dev/null
+    # Path is resolved at runtime from myprompts_root -- shellcheck cannot
+    # follow it statically.
+    . "$myprompts_root/lib/prompt_common.sh"
+else
+    return 0
+fi
+mp_load_theme
 
-# Vaporwave color palette
-NEON_PINK='\[\033[38;5;198m\]'      # Hot pink
-NEON_PURPLE='\[\033[38;5;141m\]'    # Light purple
-NEON_CYAN='\[\033[38;5;51m\]'       # Bright cyan
-NEON_BLUE='\[\033[38;5;39m\]'       # Electric blue
-SUNSET_ORANGE='\[\033[38;5;209m\]'  # Sunset orange
-MINT_GREEN='\[\033[38;5;85m\]'      # Mint/seafoam
-DARK_PURPLE='\[\033[38;5;93m\]'     # Deep purple
-HOT_MAGENTA='\[\033[38;5;201m\]'    # Magenta
+# Wrap raw escapes in \[ \] so readline does not count them toward line width.
+mp_c() { printf '\[%s\]' "$(mp_fg "$1")"; }
+mp_r() { printf '\[%s\]' "$(mp_reset)"; }
+mp_b() { printf '\[%s\]' "$(mp_bold)"; }
 
-# Background colors for that terminal aesthetic
-BG_DARK='\[\033[48;5;234m\]'        # Very dark gray background
-BG_PURPLE='\[\033[48;5;54m\]'       # Dark purple background
+# Colors are fixed at source time; only content varies per draw.
+# Each MP_ACCENT*/MP_OK/MP_INFO/MP_ERR/MP_MUTED role variable below is set by
+# the sourced theme file (themes/*.sh via mp_load_theme), which shellcheck
+# cannot follow statically, so it reads as a possible misspelling of the
+# MP_C_* variable being assigned. Disabled per-line rather than file-wide.
+# shellcheck disable=SC2153
+MP_C_ACCENT1=$(mp_c "$MP_ACCENT1")
+# shellcheck disable=SC2153
+MP_C_ACCENT2=$(mp_c "$MP_ACCENT2")
+# shellcheck disable=SC2153
+MP_C_ACCENT3=$(mp_c "$MP_ACCENT3")
+MP_C_OK=$(mp_c "$MP_OK")
+# shellcheck disable=SC2153
+MP_C_INFO=$(mp_c "$MP_INFO")
+# shellcheck disable=SC2153
+MP_C_ERR=$(mp_c "$MP_ERR")
+# shellcheck disable=SC2153
+MP_C_MUTED=$(mp_c "$MP_MUTED")
+MP_C_RESET=$(mp_r)
+MP_C_BOLD=$(mp_b)
 
-# Function to get git branch if in a git repo
-git_branch() {
-    git branch 2> /dev/null | sed -e '/^[^*]/d' -e 's/* \(.*\)/『\1』/'
+# Lowercase via tr, not the bash-4-only case-modification expansion: macOS ships bash 3.2.
+myprompts_style="${MYPROMPTS_PROMPT_STYLE:-compact}"
+myprompts_style=$(printf '%s' "$myprompts_style" | tr '[:upper:]' '[:lower:]')
+
+# Writes into the caller-named variable ($1) instead of stdout so the caller
+# can assemble "pre" with no command substitution (no subprocess fork).
+myprompts_ssh_segment() {
+    local outvar=$1
+    if [ -n "${SSH_CONNECTION:-}" ] || [ -n "${SSH_TTY:-}" ]; then
+        printf -v "$outvar" '%sssh%s ' "$MP_C_INFO" "$MP_C_RESET"
+    fi
 }
 
-style="${MYPROMPTS_PROMPT_STYLE:-compact}"
-style=${style,,}
+# Takes an optional euid as the second argument so it is testable without
+# being root. Writes into the caller-named variable ($1); see above.
+myprompts_root_segment() {
+    local outvar=$1
+    local euid=${2:-$EUID}
+    if [ "$euid" -eq 0 ]; then
+        printf -v "$outvar" '%s%s#%s ' "$MP_C_ERR" "$MP_C_BOLD" "$MP_C_RESET"
+    fi
+}
 
-if [[ $style == extended ]]; then
-    PS1="${NEON_PINK}◤${NEON_CYAN}\u${NEON_PINK}◢${RESET}"
-    PS1+=" ${NEON_CYAN}◆${RESET} "
-    PS1+="${NEON_PINK}◤${NEON_PURPLE}\h${NEON_PINK}◢${RESET} "
-    PS1+="${MINT_GREEN}➤ ${NEON_BLUE}\w${RESET} "
-    PS1+="${HOT_MAGENTA}\$(git_branch)${RESET}"
-    PS1+=$'\n'
-    PS1+="${SUNSET_ORANGE}╰─${NEON_BLUE}▸${RESET} "
+# `jobs %%` is a builtin returning 0 iff a job exists. No subprocess.
+# \j is passed as an argument, not in the format string: printf's handling of
+# unknown backslash escapes in a format is undefined. PS1 expands it later.
+# Writes into the caller-named variable ($1); see above.
+myprompts_jobs_segment() {
+    local outvar=$1
+    if jobs %% >/dev/null 2>&1; then
+        printf -v "$outvar" '%s⚙%s%s ' "$MP_C_MUTED" '\j' "$MP_C_RESET"
+    fi
+}
+
+myprompts_timer_start() {
+    if [ -z "${myprompts_timer:-}" ]; then
+        myprompts_timer=$SECONDS
+    fi
+}
+
+myprompts_build_ps1() {
+    local exit_code=$?     # MUST be the first statement. Do not move.
+
+    local elapsed=0
+    if [ -n "${myprompts_timer:-}" ]; then
+        ((elapsed = SECONDS - myprompts_timer))
+    fi
+    unset myprompts_timer
+
+    local status_seg=""
+    if [ "$exit_code" -ne 0 ]; then
+        status_seg="${MP_C_ERR}✗${exit_code}${MP_C_RESET} "
+    fi
+
+    local dur_seg=""
+    if [ "$elapsed" -ge "${MYPROMPTS_DURATION_MIN:-5}" ]; then
+        dur_seg="${MP_C_MUTED}${elapsed}s${MP_C_RESET} "
+    fi
+
+    local git_seg
+    git_seg=$(mp_git_segment)
+    if [ -n "$git_seg" ]; then
+        git_seg="${MP_C_ACCENT3}${git_seg}${MP_C_RESET} "
+    fi
+
+    local root_seg=""
+    myprompts_root_segment root_seg
+    local ssh_seg=""
+    myprompts_ssh_segment ssh_seg
+    local jobs_seg=""
+    myprompts_jobs_segment jobs_seg
+
+    local pre
+    pre="${root_seg}${ssh_seg}${status_seg}${dur_seg}${jobs_seg}"
+
+    if [ "$myprompts_style" = "extended" ]; then
+        PS1="${pre}${MP_C_ACCENT1}\u${MP_C_INFO}@${MP_C_ACCENT2}\h${MP_C_RESET} "
+        PS1="${PS1}${MP_C_OK}\w${MP_C_RESET} ${git_seg}"
+        PS1="${PS1}"$'\n'"${MP_C_ACCENT1}╰─${MP_C_INFO}▸${MP_C_RESET} "
+    else
+        PS1="${pre}${MP_C_ACCENT1}◤${MP_C_ACCENT2}\u${MP_C_INFO}@${MP_C_ACCENT2}\h${MP_C_ACCENT1}◢${MP_C_RESET} "
+        PS1="${PS1}${MP_C_ACCENT1}【${MP_C_OK}\w${MP_C_ACCENT1}】${MP_C_RESET} "
+        PS1="${PS1}${git_seg}${MP_C_INFO}${MP_C_BOLD}▸${MP_C_RESET} "
+    fi
+}
+
+# Arm the command timer just before each command runs.
+#
+# bash 4.4+ has PS0, which the shell expands before running each command
+# line. PS0 is an ordinary variable, so we can append to whatever the user
+# already set instead of replacing it, and it cannot collide with a DEBUG
+# trap at all. The expansion has to produce no output, hence slicing an
+# always-empty variable to zero length; the arithmetic inside the slice is
+# what actually arms the timer, and the comma operator discards its value.
+#
+# bash 3.2 (the macOS system bash) has no PS0 and falls back to a DEBUG
+# trap. That fallback deliberately does not try to chain onto a DEBUG trap
+# the user set first, because it cannot: a sourced file cannot read an
+# inherited DEBUG trap -- `trap -p DEBUG` reports nothing from inside one,
+# at function scope, at file scope, and through a redirect alike -- and bash
+# 3.2 will not let a sourced file replace one either. When the user already
+# has a DEBUG trap on bash 3.2, theirs keeps working and no duration is
+# shown. On bash 4.4+ both work.
+# Referenced only from inside the single-quoted PS0 below, which the shell
+# expands at prompt time -- shellcheck cannot see that use.
+# shellcheck disable=SC2034
+myprompts_ps0_nil=''
+
+if [ "${BASH_VERSINFO[0]}" -gt 4 ] ||
+   { [ "${BASH_VERSINFO[0]}" -eq 4 ] && [ "${BASH_VERSINFO[1]}" -ge 4 ]; }; then
+    # SC2016 is deliberate here: PS0 must reach the shell unexpanded so it is
+    # evaluated at prompt time. A directive cannot sit on a single case
+    # branch, so it scopes the whole statement.
+    # shellcheck disable=SC2016
+    case "${PS0:-}" in
+        *myprompts_ps0_nil*) ;;  # already installed; re-sourcing must not stack
+        *) PS0='${myprompts_ps0_nil:0:$((myprompts_timer=SECONDS, 0))}'"${PS0:-}" ;;
+    esac
 else
-    # Vaporwave-style prompt with Japanese aesthetic elements
-    # Format: ◤user@host◢ 【path】 『git』 ▸
-    PS1="${BG_DARK}${NEON_PINK}◤${NEON_CYAN}\u${DARK_PURPLE}@${NEON_PURPLE}\h${NEON_PINK}◢${RESET} "
-    PS1+="${SUNSET_ORANGE}【${MINT_GREEN}\w${SUNSET_ORANGE}】${RESET} "
-    PS1+="${HOT_MAGENTA}\$(git_branch)${RESET} "
-    PS1+="${NEON_BLUE}${BOLD}▸${RESET} "
+    trap myprompts_timer_start DEBUG
 fi
 
-# Export the prompt
+case ";${PROMPT_COMMAND:-};" in
+    *";myprompts_build_ps1;"*) ;;
+    *) PROMPT_COMMAND="myprompts_build_ps1${PROMPT_COMMAND:+;$PROMPT_COMMAND}" ;;
+esac
+
+myprompts_build_ps1
 export PS1

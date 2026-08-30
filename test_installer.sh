@@ -39,10 +39,7 @@ setup_test_env() {
     TEST_DIR=$(mktemp -d)
     export HOME="$TEST_DIR"
     export INSTALL_ROOT="$TEST_DIR/.local/share/myprompts"
-    export BASE_URL="file://$PWD"
     export MYPROMPTS_NONINTERACTIVE=1
-    export CONFIG_TMP_DIR="$TEST_DIR/config"
-    mkdir -p "$CONFIG_TMP_DIR"
 }
 
 cleanup_test_env() {
@@ -68,9 +65,14 @@ test_empty_array_handling() {
             done
         fi
 
-        # Test parameter expansion for empty arrays
+        # Test parameter expansion for empty arrays. The scalar assignment is
+        # intentional: this mirrors the empty-array expansion install.sh performs
+        # under set -u, and the test only proves it does not throw an unbound
+        # error — the joined value itself is never used.
         local result
+        # shellcheck disable=SC2124  # scalar-from-array join is the pattern under test
         result=${empty_array[@]+"${empty_array[@]}"}
+        : "$result"
 
         test_pass
     ) 2>/dev/null || test_fail "Empty array caused unbound variable error"
@@ -82,6 +84,7 @@ test_filter_missing_packages_empty() {
     setup_test_env
 
     # Source the function
+    # shellcheck disable=SC1091  # install.sh is present at runtime; shellcheck cannot follow it without -x
     source ./install.sh 2>/dev/null || true
 
     # Mock brew command to say everything is installed
@@ -92,10 +95,13 @@ test_filter_missing_packages_empty() {
     }
     export -f brew
 
-    # Test with packages that are all "installed"
+    # Test with packages that are all "installed". Capture stdout only: the
+    # function's return value is the list of packages still to install (empty
+    # here), while its "already installed; skipping" notices go to stderr by
+    # design. Folding stderr in with 2>&1 would defeat that and never be empty.
     local result
-    result=$(filter_missing_packages brew_formulae gh nmap netcat 2>&1) || {
-        test_fail "Function failed: $result"
+    result=$(filter_missing_packages brew_formulae gh nmap netcat) || {
+        test_fail "Function failed"
         cleanup_test_env
         return
     }
@@ -124,8 +130,12 @@ test_ansible_args_empty() {
             ansible_args+=(-b)
         fi
 
-        # This should not fail with empty array
+        # This should not fail with empty array. As above, the scalar join is
+        # the pattern under test; the built string is only checked for not
+        # throwing under set -u.
+        # shellcheck disable=SC2124  # scalar-from-array join is the pattern under test
         local cmd="ansible-playbook test.yml ${ansible_args[@]+"${ansible_args[@]}"}"
+        : "$cmd"
 
         test_pass
     ) 2>/dev/null || test_fail "Empty ansible_args caused error"
@@ -175,7 +185,6 @@ test_installer_noninteractive() {
 
     # Run installer in non-interactive mode
     if HOME="$TEST_DIR" \
-       BASE_URL="file://$PWD" \
        INSTALL_ROOT="$TEST_DIR/.myprompts" \
        MYPROMPTS_NONINTERACTIVE=1 \
        PROMPT_VARIANT=bash \
@@ -196,14 +205,12 @@ test_reinstall_flow() {
 
     # First install
     HOME="$TEST_DIR" \
-    BASE_URL="file://$PWD" \
     INSTALL_ROOT="$TEST_DIR/.myprompts" \
     MYPROMPTS_NONINTERACTIVE=1 \
     bash ./install.sh >/dev/null 2>&1
 
     # Reinstall should fail in non-interactive mode
     if HOME="$TEST_DIR" \
-       BASE_URL="file://$PWD" \
        INSTALL_ROOT="$TEST_DIR/.myprompts" \
        MYPROMPTS_NONINTERACTIVE=1 \
        bash ./install.sh >/dev/null 2>&1; then
@@ -216,14 +223,36 @@ test_reinstall_flow() {
     cleanup_test_env
 }
 
+test_neofetch_config_backed_up() {
+    test_start "install backs up a pre-existing neofetch config"
+    setup_test_env
+    mkdir -p "$HOME/.config/neofetch"
+    printf 'ORIGINAL\n' >"$HOME/.config/neofetch/config.conf"
+
+    # setup_test_env exports MYPROMPTS_NONINTERACTIVE=1, and
+    # handle_package_bootstrap returns early when INTERACTIVE is 0. So this
+    # installs no packages. Do not add a skip flag; one is not needed.
+    PROMPT_STYLE=compact bash ./install.sh >/dev/null 2>&1 || true
+
+    local backup="$HOME/.config/neofetch/config.conf.myprompts-backup"
+    if [[ -f $backup ]] && [[ "$(cat "$backup")" == "ORIGINAL" ]]; then
+        test_pass
+    else
+        test_fail "backup missing or wrong contents"
+    fi
+    cleanup_test_env
+}
+
 test_shellcheck() {
     test_start "shellcheck validation"
 
     if command -v shellcheck >/dev/null 2>&1; then
-        if shellcheck -S error install.sh >/dev/null 2>&1; then
+        # install.sh sources lib/*.sh via a runtime-computed path; shellcheck
+        # only resolves those cross-file globals when both are passed together.
+        if shellcheck install.sh lib/*.sh >/dev/null 2>&1; then
             test_pass
         else
-            test_fail "Shellcheck found errors"
+            test_fail "Shellcheck found warnings at default severity"
         fi
     else
         echo -e "${YELLOW}SKIP${NC} (shellcheck not installed)"
@@ -244,6 +273,7 @@ main() {
     test_bash_compatibility
     test_installer_noninteractive
     test_reinstall_flow
+    test_neofetch_config_backed_up
     test_shellcheck
 
     echo

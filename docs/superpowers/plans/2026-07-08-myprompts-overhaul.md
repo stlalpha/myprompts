@@ -1805,10 +1805,26 @@ if the user opts in and it is missing**, and when active **fully replaces** the
 native package manager on Linux — apt/dnf/pacman are skipped entirely and every
 package is installed through brew.
 
-**Files:**
-- Modify: `lib/os.sh` — `ensure_homebrew_in_path` and package-manager selection
-- Modify: `lib/packages.sh` — `ensure_homebrew`, `handle_package_bootstrap`
-- Modify: `config/packages.sh` — a shared brew formulae list usable on both OSes
+**ARCHITECTURE CORRECTION (discovered after Task 12 landed — the original 12b
+spec below was wrong).** Packages are NOT installed by the `install_*` bash
+functions. `install_brew_formulae`, `install_apt_packages`, etc. in
+`lib/packages.sh` are **dead code** — nothing calls them. The real install path
+is **Ansible**: `handle_package_bootstrap` only *filters* packages into the
+`pending_*` arrays, `generate_ansible_vars` (lib/ansible.sh) writes them to a
+vars file, and `ansible/playbook.yml` does the installing. The playbook gates
+every Homebrew task on `when: target_os == 'macos'`. So brew-on-Linux is a
+**two-layer** change, not the bash-only change the requirements below imply.
+
+**Files (corrected):**
+- Modify: `lib/os.sh` — brew PATH resolution / package-manager selection
+- Modify: `lib/packages.sh` — `ensure_homebrew_in_path`, `handle_package_bootstrap`
+- Modify: `lib/ansible.sh` — `generate_ansible_vars` must emit a "use brew" signal
+- Modify: `ansible/playbook.yml` — Homebrew formulae task must run on Linux when
+  that signal is set (the design decision: introduce a `package_manager` value
+  like `brew`, and gate the formulae task on
+  `package_manager == 'brew' or target_os == 'macos'`; casks + App Store stay
+  `target_os == 'macos'` only)
+- Modify: `config/packages.sh` — shared brew formulae list usable on both OSes
 - Test: extend `test_installer.sh`
 
 **Behavioral requirements:**
@@ -1818,39 +1834,42 @@ package is installed through brew.
    exactly as today (native package manager). Default is native.
 
 2. **Bootstrap if missing.** When the user opts in and `brew` is not found, run
-   the same official installer the macOS path already uses
-   (`ensure_homebrew`) — the Homebrew install script installs to
-   `/home/linuxbrew/.linuxbrew` on Linux. Do **not** run it as root; Homebrew
-   refuses root and the playbook already guards against it. Mirror the macOS
-   consent/prompt flow.
+   the same official installer the macOS path already uses (`ensure_homebrew`) —
+   it installs to `/home/linuxbrew/.linuxbrew` on Linux. Do **not** run it as
+   root. Mirror the macOS consent/prompt flow.
 
-3. **PATH resolution.** `ensure_homebrew_in_path` currently checks only
-   `/opt/homebrew/bin/brew` and `/usr/local/bin/brew` (both macOS). Add the
-   Linux location: `/home/linuxbrew/.linuxbrew/bin/brew` and
-   `"$HOME/.linuxbrew/bin/brew"`, running `eval "$(<path> shellenv)"` for
-   whichever exists.
+3. **PATH resolution.** `ensure_homebrew_in_path` (in `lib/packages.sh`, not
+   `lib/os.sh`) currently checks only `/opt/homebrew/bin/brew` and
+   `/usr/local/bin/brew`. Add `/home/linuxbrew/.linuxbrew/bin/brew` and
+   `"$HOME/.linuxbrew/bin/brew"`, `eval "$(<path> shellenv)"` for whichever exists.
 
-4. **Replace native.** When brew is active on Linux, `handle_package_bootstrap`
-   installs the shared brew formulae list via `install_brew_formulae` and does
-   **not** call `detect_linux_package_manager` / the apt/dnf/pacman install path
-   at all. `install_brew_casks` and the App Store path stay macOS-only.
+4. **Replace native — via the pending arrays + Ansible, not a direct call.**
+   When brew is active on Linux, `handle_package_bootstrap` must filter the
+   shared brew formulae list into `pending_macos_brew_formulae` (the existing
+   brew pending array the playbook already reads), set the manager signal to
+   `brew`, and NOT populate the apt/dnf/pacman pending arrays. Then
+   `generate_ansible_vars` passes `package_manager=brew`, and the playbook's
+   formulae task fires on Linux. Do NOT wire `install_brew_formulae` directly —
+   it is dead code; either delete it separately or leave it, but do not build on
+   it.
 
-5. **Shared list.** The brew formulae installed on Linux are the same
-   `macos_brew_formulae` list (consider renaming to `brew_formulae` with a
-   backward-compatible alias, or documenting that the macOS list is the shared
-   brew list). Do not silently install the *native* lists via brew — package
-   names differ (e.g. `netcat` vs `gnu-netcat`).
+5. **Shared list.** The brew formulae are the same `macos_brew_formulae` list.
+   Do not install the *native* lists via brew — names differ (`netcat` vs
+   `gnu-netcat`).
 
 **Verification:**
-- On a Linux box with `MYPROMPTS_LINUX_BREW=1` and brew absent: the installer
-  bootstraps brew, adds it to PATH, and installs the brew formulae; apt/dnf/pacman
-  are never invoked (assert via a stubbed package manager that records calls).
-- With the opt-in unset: apt/dnf/pacman still run, brew is never installed —
-  a regression guard proving the default is unchanged.
-- macOS behavior is completely unaffected.
+- On a Linux box with `MYPROMPTS_LINUX_BREW=1` and brew absent: bootstraps brew,
+  adds it to PATH, generates ansible vars with `package_manager=brew` and the
+  brew formulae; the apt/dnf/pacman pending arrays are empty. Assert the vars
+  file, and (if Ansible is stubbable) that the native tasks are skipped.
+- With the opt-in unset: the native pending arrays are populated as today, no
+  brew — a regression guard proving the default is unchanged.
+- macOS behavior completely unaffected (the playbook's macOS gates unchanged;
+  only the formulae task's `when` broadens to include `package_manager == 'brew'`).
 
-**Out of scope for 12b:** migrating the existing native package lists to brew
-names; brew casks on Linux (Linuxbrew has no cask support).
+**Out of scope for 12b:** migrating native package lists to brew names; brew
+casks on Linux (Linuxbrew has no cask support); deleting the dead `install_*`
+functions (separate cleanup).
 
 ---
 

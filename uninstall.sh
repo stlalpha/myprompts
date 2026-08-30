@@ -15,6 +15,7 @@ MARKERS=(
 )
 
 info()  { printf '\033[1;36m[info]\033[0m %s\n' "$*"; }
+warn()  { printf '\033[1;33m[warn]\033[0m %s\n' "$*" >&2; }
 
 # Remove the opening marker .. closing marker span, inclusive, plus exactly
 # one of the blank lines preceding it. append_block writes
@@ -29,17 +30,27 @@ strip_block() {
 
   local start="# >>> $name >>>"
   local end="# <<< $name <<<"
+  # Older installs wrote "# <<< NAME >>>" (append_block replaced only the first
+  # arrow). Accept both, or those blocks are unremovable.
+  local legacy_end="# <<< $name >>>"
   grep -Fq "$start" "$file" || return 0
+  # The awk below clears in_block only on an exact match of the end marker.
+  # Without that line it would run to EOF and discard everything after the
+  # opening marker -- the user's own content included. Refuse instead.
+  if ! grep -Fq "$end" "$file" && ! grep -Fq "$legacy_end" "$file"; then
+    warn "Unterminated '$name' block in ${file/#$HOME/~} (no '$end'); leaving the file untouched. Remove the block by hand."
+    return 0
+  fi
 
   local tmp
   tmp=$(mktemp)
-  awk -v start="$start" -v end="$end" '
+  awk -v start="$start" -v end="$end" -v legacy="$legacy_end" '
     # Buffer blank lines; they are only emitted if not followed by a marker.
     /^$/ && !in_block { blanks = blanks "\n"; next }
     # append_block owns exactly one buffered blank line before the marker;
     # drop that one and re-emit the rest (the caller'"'"'s own blank lines).
     $0 == start { printf "%s", substr(blanks, 2); blanks = ""; in_block = 1; next }
-    $0 == end   { in_block = 0; next }
+    ($0 == end || $0 == legacy) { in_block = 0; next }
     in_block { next }
     { printf "%s", blanks; blanks = ""; print }
     END { printf "%s", blanks }

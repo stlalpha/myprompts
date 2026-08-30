@@ -75,20 +75,43 @@ append_block() {
   local file=$1
   local marker=$2
   local line=$3
-  local end_marker=${marker/>>>/<<<}
+  # Replace BOTH arrows: ${marker/>>>/<<<} substitutes only the first, which
+  # produced "# <<< NAME >>>" while uninstall.sh looked for "# <<< NAME <<<".
+  # They never matched, so removal fell through to truncating at EOF.
+  local end_marker=${marker//>>>/<<<}
+  # rc files written before that fix carry the asymmetric form. Recognise it so
+  # an existing install stays updatable; the rewrite below normalises it.
+  local legacy_end_marker=${marker/>>>/<<<}
 
   touch "$file"
-  if grep -F "$marker" "$file" >/dev/null 2>&1; then
+  # Both markers must be present to rewrite in place. The awk below clears
+  # in_block only on an exact match of the end marker, so if the user edited
+  # or deleted that line, every remaining line of their rc file would be
+  # dropped. Treat a half-open block as absent and append a fresh one: the
+  # orphaned opening marker is untidy, but the user's content survives.
+  if grep -F "$marker" "$file" >/dev/null 2>&1 &&
+     ! grep -F "$end_marker" "$file" >/dev/null 2>&1 &&
+     ! grep -F "$legacy_end_marker" "$file" >/dev/null 2>&1; then
+    warn "Unterminated myprompts block in ${file/#$HOME/~} (no '$end_marker'); appending a new block and leaving your content untouched."
+  fi
+  if grep -F "$marker" "$file" >/dev/null 2>&1 &&
+     { grep -F "$end_marker" "$file" >/dev/null 2>&1 ||
+       grep -F "$legacy_end_marker" "$file" >/dev/null 2>&1; }; then
     info "Updating existing block in ${file/#$HOME/~}."
     local tmp
     tmp=$(mktemp)
-    awk -v start="$marker" -v end="$end_marker" -v line="$line" '
+    awk -v start="$marker" -v end="$end_marker" \
+        -v legacy="$legacy_end_marker" -v line="$line" '
       BEGIN {in_block=0}
       $0 == start {print start; print line; in_block=1; next}
-      $0 == end {in_block=0; print end; next}
+      ($0 == end || $0 == legacy) {in_block=0; print end; next}
       !in_block {print}
     ' "$file" >"$tmp"
-    mv "$tmp" "$file"
+    # Write into the existing file (not mv) so its mode, inode and symlink
+    # target survive; mktemp's 0600 temp file would otherwise tighten
+    # permissions and turn a symlinked rc into a regular file.
+    cat "$tmp" > "$file"
+    rm -f "$tmp"
   else
     {
       printf '\n%s\n' "$marker"

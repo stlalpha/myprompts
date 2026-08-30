@@ -1,11 +1,17 @@
 # myprompts overhaul — status
 
-**Branch:** `feat/overhaul` (14 commits, unpushed). `main` is untouched.
+**Status: COMPLETE.** Merged to `main` via PR #2 (merge commit `1f7f5c1`) on
+2026-08-30. Tasks 1-12 all landed. Task 12b (Homebrew on Linux) is the only
+plan item still outstanding.
+
+**Branch:** `feat/overhaul` (merged and deleted).
 **Plan:** `docs/superpowers/plans/2026-07-08-myprompts-overhaul.md`
 **Spec:** `docs/superpowers/specs/2026-07-08-myprompts-overhaul-design.md`
 
-Tasks 1–7 are complete and reviewed. Tasks 8–12 are unstarted and fully specced
-in the plan; they can be picked up cold.
+Tasks 1-7 were complete and reviewed when this file was first written; tasks
+8-12 landed afterwards. The per-task detail below was accurate at the time and
+is kept as a record -- see the corrections at the bottom for what has since
+been proven wrong.
 
 ## Current test state
 
@@ -19,7 +25,7 @@ in the plan; they can be picked up cold.
 
 `shellcheck` is clean on every script and on `vaporwave_bash_prompt`.
 
-### The pre-existing `test_installer.sh` failure
+### The pre-existing `test_installer.sh` failure (since fixed)
 
 Not caused by this branch. `filter_missing_packages` leaks `[info] brew formula
 'gh' already installed; skipping.` lines into its return value, so the
@@ -79,8 +85,10 @@ are recorded because they are the kind of thing that gets "fixed" back.
    parser. Commit `1deccda`.
 
 Two facts asserted early on turned out to be false and were corrected in the
-spec: `date +%N` **does** work on Darwin 25, and `neofetch`/`netcat` are **still**
-installable via Homebrew. Neither is a bug. Do not "fix" them.
+spec: `date +%N` **does** work on Darwin 25, and `neofetch`/`netcat` were then
+still installable via Homebrew.
+
+> **The neofetch half of that has since expired -- see the corrections below.**
 
 ## Open minor items for the final review
 
@@ -97,23 +105,54 @@ installable via Homebrew. Neither is a bug. Do not "fix" them.
   indistinguishable from a detached HEAD. Inherent to `--porcelain=v2`.
 - The static grep misses the pattern-restricted forms (`${var^^pattern}`).
 
+## Corrections found after this file was written
+
+Both of these were recorded here as settled facts and were relied on. They are
+not. Read this section before trusting anything above it.
+
+1. **"`neofetch` is still installable via Homebrew. Do not 'fix' it." -- no
+   longer true.** neofetch was archived upstream in April 2024 and the Homebrew
+   formula has since been delisted: `formulae.brew.sh/api/formula/neofetch.json`
+   returns 404 while the formula index returns 200. The original check was
+   almost certainly `brew list` against an already-installed copy, which
+   succeeds forever regardless of what the tap ships. Migrated to `fastfetch`
+   in PR #3. The "do not fix" instruction is what made this worth writing down:
+   a correct-at-the-time fact, stated as a standing prohibition, outlived its
+   own truth.
+
+2. **"The DEBUG-trap chain was fixed in `1deccda`" -- it never worked.**
+   `myprompts_capture_debug_trap` read the previous trap with
+   `spec=$(trap -p DEBUG)`, but a sourced file cannot see a DEBUG trap set by
+   its caller: `trap -p DEBUG` reports nothing from inside one, at function
+   scope, at file scope, and through a plain redirect alike. `spec` was always
+   empty, so the capture always returned early and the previous body was never
+   recorded. With a pre-existing DEBUG trap the measured behaviour was: bash
+   3.2 kept the user's trap and never installed our timer; bash 5.x destroyed
+   the user's trap and installed ours. Two defects that cancelled on 3.2 into
+   exactly the string the test grepped for, which is why the suite was green on
+   macOS and went red the first time CI ran it on bash 5.2. Replaced with `PS0`
+   on bash 4.4+ (which chains properly, since `PS0` is a readable variable) and
+   a documented limitation on bash 3.2.
+
 ## Remaining tasks
 
-- **Task 8** — delete `vaporwave_liquid_prompt`, strip `PROMPT_LIQUID` and
+All of the below are now DONE except Task 12b.
+
+- **Task 8** (done) — delete `vaporwave_liquid_prompt`, strip `PROMPT_LIQUID` and
   `choose_prompt_variant` from `install.sh`, update `README.md` / `CLAUDE.md`.
   Also corrects a doc bug: both claim non-interactive mode still installs
   packages. It does not — `handle_package_bootstrap` returns early when
   `INTERACTIVE` is 0.
-- **Task 9** — back up an existing neofetch config before overwriting it.
+- **Task 9** (done) — back up an existing neofetch config before overwriting it.
   Prerequisite for uninstall.
-- **Task 10** — `uninstall.sh`. Must consume the blank line `append_block` emits
+- **Task 10** (done) — `uninstall.sh`. Must consume the blank line `append_block` emits
   before each marker, or the byte-identical assertion cannot pass.
-- **Task 11** — `run_tests.sh` + GitHub Actions on ubuntu + macos.
+- **Task 11** (done) — `run_tests.sh` + GitHub Actions on ubuntu + macos.
   **Blocked** on the `test_installer.sh` failure above.
-- **Task 12** — split `install.sh` into `lib/` modules behind a
+- **Task 12** (done) — split `install.sh` into `lib/` modules behind a
   bootstrap-then-exec. No behaviour change. Its `curl | bash` verification
   needs a pushed branch and network; that step is a hard merge gate.
-- **Task 12b** (added post-plan) — Homebrew on Linux, folded into the Task 12
+- **Task 12b** (OUTSTANDING -- the only one left) — Homebrew on Linux, folded into the Task 12
   refactor. Opt-in, bootstrap-installs brew if missing, and when active fully
   replaces apt/dnf/pacman on Linux. Full spec is in the plan file after Task 12.
 

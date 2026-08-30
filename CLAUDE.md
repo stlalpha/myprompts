@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Vaporwave-themed shell prompt system with automated configuration and package installation. Two prompt variants (static Bash, Zsh) with matching LS colors, distributed via curl-friendly install script that bootstraps both prompts and packages via Ansible.
+Themed shell prompt system with automated configuration and package installation. Two prompt variants (Bash, Zsh) sharing a theme layer (`signalmine` default, `vaporwave`, `ember`) and matching LS colors, distributed via a curl-friendly install script that bootstraps prompts and packages via Ansible.
 
 ## Architecture
 
@@ -16,7 +16,7 @@ Vaporwave-themed shell prompt system with automated configuration and package in
 
 ### Installation Flow
 1. `install.sh` detects existing installations and prompts for purge if needed
-2. Downloads prompt files, LS colors, and config files to `~/.local/share/myprompts`
+2. Resolves its source tree: uses an adjacent `lib/` when run from a clone, otherwise fetches the repo tarball and re-execs (this is what makes `curl | bash` work). Installs prompt files, themes, LS colors and the fastfetch config to `~/.local/share/myprompts`
 3. Sources `config/packages.sh` (Bash-sourced, not parsed) to build OS-specific package lists
 4. Generates `ansible_vars.yml` with platform-filtered packages
 5. Executes `ansible/playbook.yml` locally with `hosts: localhost` to install packages
@@ -67,8 +67,8 @@ MYPROMPTS_PROMPT_STYLE=extended source ./vaporwave_bash_prompt
 ### Testing Installer
 Local test with temporary HOME:
 ```bash
-HOME=$(mktemp -d) BASE_URL="file://$PWD" INSTALL_ROOT="$HOME/.myprompts" \
-SHELL=/bin/bash bash ./install.sh
+T=$(mktemp -d)
+HOME="$T" INSTALL_ROOT="$T/.myprompts" SHELL=/bin/bash bash ./install.sh
 ```
 
 Non-interactive with pre-selected options:
@@ -84,8 +84,14 @@ ls -la --color=auto
 ```
 
 ### Linting
+`install.sh` and `lib/*.sh` must be linted in one invocation: `install.sh`
+sources the modules via a runtime-computed path, so shellcheck resolves the
+cross-file globals only when it sees both. `vaporwave_zsh_prompt` is
+deliberately excluded -- shellcheck has no zsh support.
 ```bash
-shellcheck vaporwave_*.sh vaporwave_*prompt install.sh config/*.sh
+shellcheck install.sh uninstall.sh run_tests.sh vaporwave_ls_setup.sh \
+           config/*.sh themes/*.sh lib/*.sh test_*.sh
+shellcheck --shell=bash vaporwave_bash_prompt
 ```
 
 ### Test Suite
@@ -137,8 +143,14 @@ linux_paru_packages=(gnu-netcat YOUR_AUR_PACKAGE)
 
 ## Key Files
 
-- `install.sh`: Main bootstrapper with OS detection, interactive prompts, file download, config parsing, Ansible execution
-- `vaporwave_bash_prompt`: Static Bash prompt with git branch detection and vaporwave palette
+- `install.sh`: Bootstrapper -- resolves the source tree (adjacent `lib/`, else repo tarball + re-exec), then drives the modules below
+- `lib/ui.sh`, `lib/os.sh`, `lib/packages.sh`, `lib/ansible.sh`, `lib/shell.sh`: installer modules (prompts/output, OS detection, package filtering, vars generation + playbook run, rc-file injection)
+- `lib/prompt_common.sh`: shared prompt runtime -- theme loading, color rendering, git and duration segments
+- `themes/{signalmine,vaporwave,ember}.sh`: color-role palettes as `<256index>:<hex>`
+- `uninstall.sh`: reverses `install.sh`, restoring displaced files byte-identically
+- `run_tests.sh`: aggregates every suite; this is what CI runs
+- `test_helpers.sh`: shared assertions and counters, including the accounting invariant
+- `vaporwave_bash_prompt`: Bash prompt, segment-based, bash 3.2 compatible
 - `vaporwave_zsh_prompt`: Zsh native prompt mirroring Bash layout with Zsh-specific hooks
 - `vaporwave_lscolors`: Exported `LS_COLORS` table for file extension colorization
 - `vaporwave_ls_setup.sh`: Helper to wire LS colors (for manual sourcing, legacy)

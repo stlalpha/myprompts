@@ -225,16 +225,18 @@ test_reinstall_flow() {
 
 # Guard for the neofetch -> fastfetch migration: neofetch was archived
 # upstream in 2024 and is no longer packaged by Homebrew, apt, dnf or pacman,
-# so any surviving reference is a package install that fails. docs/ is
-# excluded: the historical plan and spec legitimately discuss neofetch.
+# so any surviving *use* of it is a package install or a file path that fails.
+#
+# Scoped to the executable surface -- package lists, installer, uninstaller,
+# lib modules, playbook. Prose that explains the migration (README, CLAUDE.md,
+# the header comments in the ported configs, docs/) is deliberately out of
+# scope: describing what was replaced is not the same as still calling it.
 test_no_neofetch_references() {
-    test_start "no neofetch references remain outside docs/"
-    # Scope to tracked files: untracked scratch (agent run logs, local
-    # artifacts) is not shipped and must not fail the suite.
+    test_start "no neofetch references remain in the executable surface"
     local hits
-    # This file is excluded because the guard names the very string it hunts.
-    hits=$(git ls-files -z | grep -zv '^docs/' | grep -zv '^test_installer\.sh$' \
-             | xargs -0 grep -Il neofetch 2>/dev/null || true)
+    hits=$(grep -rIl neofetch \
+             install.sh uninstall.sh run_tests.sh config lib ansible themes \
+             2>/dev/null || true)
     if [[ -z $hits ]]; then
         test_pass
     else

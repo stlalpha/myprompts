@@ -1,6 +1,7 @@
 # myprompts
 
-Vaporwave-themed shell prompts with automated system configuration.
+Themed shell prompts with automated system configuration. Ships three
+palettes -- `signalmine` (default), `vaporwave` and `ember` -- for Bash and Zsh.
 
 ## Features
 
@@ -30,9 +31,13 @@ bash install.sh
 
 - macOS (Homebrew)
 - Linux
-  - Debian/Ubuntu (apt)
+  - Debian 13+ / Ubuntu 24.04+ (apt)
   - Fedora/RHEL (dnf)
   - Arch Linux (pacman/paru)
+
+`fastfetch` is not packaged for Debian 12 (bookworm) or older, so the apt
+package step will fail there. Everything else installs normally; drop
+`fastfetch` from `linux_apt_packages` if you are on bookworm.
 
 ## Prompt Variants
 
@@ -170,17 +175,31 @@ trap keeps working and no duration is shown. Upgrading to a current Bash
 
 ## Testing
 
-Run shellcheck on scripts:
+Run the whole suite (this is what CI runs):
 
 ```bash
-shellcheck vaporwave_*.sh vaporwave_*prompt install.sh
+./run_tests.sh
 ```
 
-Test installer locally:
+Lint. `install.sh` and `lib/*.sh` must be passed together, because `install.sh`
+sources the modules through a path computed at runtime and shellcheck can only
+resolve the cross-file globals when it sees both:
 
 ```bash
-HOME=$(mktemp -d) BASE_URL="file://$PWD" INSTALL_ROOT="$HOME/.myprompts" \
-SHELL=/bin/bash bash ./install.sh
+shellcheck install.sh uninstall.sh run_tests.sh vaporwave_ls_setup.sh \
+           config/*.sh themes/*.sh lib/*.sh test_*.sh
+shellcheck --shell=bash vaporwave_bash_prompt
+```
+
+`vaporwave_zsh_prompt` is intentionally not linted: shellcheck has no zsh
+support and misparses zsh-only syntax.
+
+Test the installer against a throwaway `HOME`:
+
+```bash
+T=$(mktemp -d)
+HOME="$T" INSTALL_ROOT="$T/.myprompts" MYPROMPTS_NONINTERACTIVE=1 \
+PROMPT_STYLE=extended SHELL=/bin/bash bash ./install.sh
 ```
 
 ## Contributing

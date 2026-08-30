@@ -4,35 +4,11 @@
 
 set -euo pipefail
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
-
-# Test counters
-TESTS_RUN=0
-TESTS_PASSED=0
-TESTS_FAILED=0
-
-# Test framework functions
-test_start() {
-    local test_name=$1
-    TESTS_RUN=$((TESTS_RUN + 1))
-    echo -n "Testing $test_name... "
-}
-
-test_pass() {
-    TESTS_PASSED=$((TESTS_PASSED + 1))
-    echo -e "${GREEN}✓${NC}"
-}
-
-test_fail() {
-    local message=$1
-    TESTS_FAILED=$((TESTS_FAILED + 1))
-    echo -e "${RED}✗${NC}"
-    echo -e "  ${RED}Failed: $message${NC}"
-}
+# Shared assertions and counters. This file used to define its own copies,
+# which drifted from the shared ones and reported "12 run, 9 passed, all tests
+# passed!" -- see the accounting invariant in test_summary.
+# shellcheck disable=SC1091 # test_helpers.sh is committed alongside this script
+source ./test_helpers.sh
 
 # Create a test environment
 setup_test_env() {
@@ -54,7 +30,7 @@ test_empty_array_handling() {
     test_start "empty array handling with set -u"
 
     # Test empty array expansion
-    (
+    if (
         set -euo pipefail
         local empty_array=()
 
@@ -74,8 +50,12 @@ test_empty_array_handling() {
         result=${empty_array[@]+"${empty_array[@]}"}
         : "$result"
 
+    ) 2>/dev/null
+    then
         test_pass
-    ) 2>/dev/null || test_fail "Empty array caused unbound variable error"
+    else
+        test_fail "Empty array caused unbound variable error"
+    fi
 }
 
 test_filter_missing_packages_empty() {
@@ -119,7 +99,7 @@ test_filter_missing_packages_empty() {
 test_ansible_args_empty() {
     test_start "ansible_args empty array on macOS"
 
-    (
+    if (
         set -euo pipefail
 
         # Simulate the fixed code
@@ -137,14 +117,18 @@ test_ansible_args_empty() {
         local cmd="ansible-playbook test.yml ${ansible_args[@]+"${ansible_args[@]}"}"
         : "$cmd"
 
+    ) 2>/dev/null
+    then
         test_pass
-    ) 2>/dev/null || test_fail "Empty ansible_args caused error"
+    else
+        test_fail "Empty ansible_args caused error"
+    fi
 }
 
 test_packages_array_iteration() {
     test_start "packages array iteration safety"
 
-    (
+    if (
         set -euo pipefail
 
         # Test the pattern used in filter_missing_packages
@@ -163,8 +147,12 @@ test_packages_array_iteration() {
             done
         fi
 
+    ) 2>/dev/null
+    then
         test_pass
-    ) 2>/dev/null || test_fail "Package array iteration failed"
+    else
+        test_fail "Package array iteration failed"
+    fi
 }
 
 test_bash_compatibility() {
@@ -249,7 +237,7 @@ test_no_neofetch_references() {
 # the neofetch -> fastfetch port produced something usable.
 test_fastfetch_configs_parse() {
     if ! command -v fastfetch >/dev/null 2>&1; then
-        echo "Testing shipped fastfetch configs parse... SKIPPED (fastfetch not installed)"
+        test_skip "shipped fastfetch configs parse" "fastfetch not installed"
         return
     fi
     local cfg
@@ -284,9 +272,13 @@ test_fastfetch_config_backed_up() {
 }
 
 test_shellcheck() {
+    if ! command -v shellcheck >/dev/null 2>&1; then
+        test_skip "shellcheck validation" "shellcheck not installed"
+        return
+    fi
     test_start "shellcheck validation"
 
-    if command -v shellcheck >/dev/null 2>&1; then
+    if true; then
         # install.sh sources lib/*.sh via a runtime-computed path; shellcheck
         # only resolves those cross-file globals when both are passed together.
         if shellcheck install.sh lib/*.sh >/dev/null 2>&1; then
@@ -294,8 +286,6 @@ test_shellcheck() {
         else
             test_fail "Shellcheck found warnings at default severity"
         fi
-    else
-        echo -e "${YELLOW}SKIP${NC} (shellcheck not installed)"
     fi
 }
 
@@ -320,15 +310,7 @@ main() {
 
     echo
     echo "========================================"
-    echo "Test Results:"
-    echo "  Total: $TESTS_RUN"
-    echo -e "  Passed: ${GREEN}$TESTS_PASSED${NC}"
-    if [[ $TESTS_FAILED -gt 0 ]]; then
-        echo -e "  Failed: ${RED}$TESTS_FAILED${NC}"
-        exit 1
-    else
-        echo -e "  ${GREEN}All tests passed!${NC}"
-    fi
+    test_summary
 }
 
 # Run tests

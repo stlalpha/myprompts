@@ -71,6 +71,18 @@ if prompt_yes_no "Proceed with reinstall?" N; then
   fi
 }
 
+# True only when every opening marker is closed by a later terminator, with no
+# stray terminator before one and none left open at EOF. uninstall.sh carries
+# an identical copy: it is deliberately standalone and does not source lib/.
+markers_well_formed() {
+  local file=$1 start=$2 end=$3 legacy=$4
+  awk -v start="$start" -v end="$end" -v legacy="$legacy" '
+    $0 == start { if (open) { exit 1 } open = 1; next }
+    ($0 == end || $0 == legacy) { if (!open) { exit 1 } open = 0; next }
+    END { if (open) exit 1 }
+  ' "$file"
+}
+
 append_block() {
   local file=$1
   local marker=$2
@@ -84,34 +96,60 @@ append_block() {
   local legacy_end_marker=${marker/>>>/<<<}
 
   touch "$file"
-  # Both markers must be present to rewrite in place. The awk below clears
-  # in_block only on an exact match of the end marker, so if the user edited
-  # or deleted that line, every remaining line of their rc file would be
-  # dropped. Treat a half-open block as absent and append a fresh one: the
-  # orphaned opening marker is untidy, but the user's content survives.
+  # Rewriting in place is only safe when the markers form ordered pairs. A
+  # mere presence check is not enough: an orphaned end marker sitting BEFORE
+  # an unmatched start marker satisfies "both strings appear", and the awk
+  # below would then enter in_block at the unmatched start and run to EOF,
+  # discarding the rest of the user's rc file. Anything malformed -- reversed,
+  # duplicated or unterminated -- falls through to appending a fresh block,
+  # which leaves existing content alone.
   if grep -F "$marker" "$file" >/dev/null 2>&1 &&
-     ! grep -F "$end_marker" "$file" >/dev/null 2>&1 &&
-     ! grep -F "$legacy_end_marker" "$file" >/dev/null 2>&1; then
-    warn "Unterminated myprompts block in ${file/#$HOME/~} (no '$end_marker'); appending a new block and leaving your content untouched."
+     ! markers_well_formed "$file" "$marker" "$end_marker" "$legacy_end_marker"; then
+    warn "Malformed myprompts block in ${file/#$HOME/~}; appending a new block and leaving your content untouched."
   fi
   if grep -F "$marker" "$file" >/dev/null 2>&1 &&
-     { grep -F "$end_marker" "$file" >/dev/null 2>&1 ||
-       grep -F "$legacy_end_marker" "$file" >/dev/null 2>&1; }; then
+     markers_well_formed "$file" "$marker" "$end_marker" "$legacy_end_marker"; then
     info "Updating existing block in ${file/#$HOME/~}."
-    local tmp
-    tmp=$(mktemp)
-    awk -v start="$marker" -v end="$end_marker" \
+    local tmp tmp_base
+    # An explicit template so TMPDIR is honoured on macOS too, where a bare
+    # `mktemp` uses the Darwin per-user directory regardless.
+    tmp_base=${TMPDIR:-/tmp}
+    tmp_base=${tmp_base%/}
+    if ! tmp=$(mktemp "$tmp_base/myprompts.XXXXXX"); then
+      warn "Could not create a temporary file; leaving ${file/#$HOME/~} unchanged."
+      return 1
+    fi
+    if ! awk -v start="$marker" -v end="$end_marker" \
         -v legacy="$legacy_end_marker" -v line="$line" '
       BEGIN {in_block=0}
       $0 == start {print start; print line; in_block=1; next}
       ($0 == end || $0 == legacy) {in_block=0; print end; next}
       !in_block {print}
-    ' "$file" >"$tmp"
+    ' "$file" >"$tmp"; then
+      warn "Failed to stage the update; leaving ${file/#$HOME/~} unchanged."
+      rm -f "$tmp"
+      return 1
+    fi
+    # `cat "$tmp" > "$file"` truncates $file before it can discover the
+    # staged copy is unusable, so validate first and keep a backup to restore
+    # from if the write itself fails partway.
+    if [[ ! -s $tmp ]]; then
+      warn "Staged update was empty; leaving ${file/#$HOME/~} unchanged."
+      rm -f "$tmp"
+      return 1
+    fi
+    local backup="$tmp.orig"
+    cp "$file" "$backup" 2>/dev/null || true
     # Write into the existing file (not mv) so its mode, inode and symlink
     # target survive; mktemp's 0600 temp file would otherwise tighten
     # permissions and turn a symlinked rc into a regular file.
-    cat "$tmp" > "$file"
-    rm -f "$tmp"
+    if ! cat "$tmp" > "$file"; then
+      warn "Write to ${file/#$HOME/~} failed; restoring the original."
+      [[ -f $backup ]] && cat "$backup" > "$file"
+      rm -f "$tmp" "$backup"
+      return 1
+    fi
+    rm -f "$tmp" "$backup"
   else
     {
       printf '\n%s\n' "$marker"

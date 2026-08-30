@@ -431,6 +431,60 @@ test_uninstall_removes_legacy_end_marker_block() {
     esac
 }
 
+# The presence guard added earlier only proved both marker strings occur
+# SOMEWHERE in the file. An orphaned end marker sitting BEFORE an unmatched
+# start marker satisfies it, and awk then enters in_block at the unmatched
+# start and runs to EOF -- restoring the exact truncation the guard exists to
+# prevent. Markers must form ordered pairs.
+test_uninstall_rejects_out_of_order_markers() {
+    test_start "uninstall leaves the file alone when markers are out of order"
+    local T; T=$(mktemp -d)
+    {
+        printf 'export BEFORE=1\n'
+        printf '# <<< myprompts prompt <<<\n'
+        printf '# >>> myprompts prompt >>>\n'
+        printf 'source /somewhere\n'
+        printf 'export AFTER=1\n'
+        printf "alias deploy='make deploy'\n"
+    } > "$T/.bashrc"
+    local before; before=$(cksum < "$T/.bashrc")
+
+    if ! run_uninstall "$T"; then
+        test_fail "uninstall.sh failed"; rm -rf "$T"; return
+    fi
+    local after; after=$(cksum < "$T/.bashrc")
+    local content; content=$(cat "$T/.bashrc")
+    rm -rf "$T"
+    if [ "$before" = "$after" ]; then
+        test_pass
+    else
+        test_fail "out-of-order markers were rewritten, losing content: $(printf '%s' "$content" | tr '\n' '|')"
+    fi
+}
+
+test_install_rejects_out_of_order_markers() {
+    test_start "install leaves user content alone when markers are out of order"
+    local T; T=$(mktemp -d)
+    {
+        printf 'export BEFORE=1\n'
+        printf '# <<< myprompts prompt <<<\n'
+        printf '# >>> myprompts prompt >>>\n'
+        printf 'source /somewhere\n'
+        printf 'export AFTER=1\n'
+        printf "alias deploy='make deploy'\n"
+    } > "$T/.bashrc"
+
+    if ! run_install "$T"; then
+        test_fail "install.sh failed"; rm -rf "$T"; return
+    fi
+    local content; content=$(cat "$T/.bashrc")
+    rm -rf "$T"
+    case "$content" in
+        *AFTER=1*"alias deploy"*) test_pass ;;
+        *) test_fail "install destroyed content after out-of-order markers: $(printf '%s' "$content" | tr '\n' '|')" ;;
+    esac
+}
+
 test_uninstall_idempotent_on_clean_system() {
     test_start "uninstall is a no-op on a clean system"
     local T; T=$(mktemp -d)
@@ -457,6 +511,8 @@ test_uninstall_restores_fastfetch_backup
 test_uninstall_idempotent_on_clean_system
 test_install_writes_symmetric_end_marker
 test_uninstall_removes_legacy_end_marker_block
+test_uninstall_rejects_out_of_order_markers
+test_install_rejects_out_of_order_markers
 test_uninstall_keeps_content_when_end_marker_missing
 test_install_keeps_content_when_end_marker_missing
 test_append_block_update_preserves_mode

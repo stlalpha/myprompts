@@ -3,7 +3,16 @@
 // upstream in 2024 and dropped by every package manager this project targets.
 //
 // Palette: cyan 44, dark cyan 24 -- the same 256-colour indices the neofetch
-// layout used.
+// layout used -- for the logo and keys. Values use the 16-colour ANSI set of
+// 90s BBS art:
+//   97 bright white   primary value
+//   96 bright cyan    numbers
+//   37 light grey     secondary text
+//   34 blue           punctuation / x
+//   90 dark grey      tags, @, [ ], ( ), and . , % (via dimdots.pl)
+//   38;2;255;85;255  VGA bright magenta (#FF55FF): text inside [ ], usage >= 80%.
+//                    Set as 24-bit because the mcbros Ghostty theme maps the
+//                    ANSI magenta slots to orange.
 //
 // The box is NOT drawn here. fastfetch has no way to pad a line to a fixed
 // width (--key-width aligns keys only, and format strings have no width
@@ -28,40 +37,54 @@
   },
 
   "display": {
-    "separator": "  "
+    "separator": "  ",
+    // usage percentages: low -> high = cyan, bright cyan, VGA magenta
+    "percent": {
+      "color": {
+        "green": "36",
+        "yellow": "96",
+        "red": "38;2;255;85;255"
+      }
+    }
   },
 
   "modules": [
     "break",
     {
       "type": "title",
-      "key": " :  User",
-      "keyColor": "38;5;44"
+      "key": "\u001b[38;5;44m :  \u001b[22m\u001b[97mU\u001b[96ms\u001b[36me\u001b[90mr",
+      "keyColor": "38;5;44",
+      "format": "\u001b[97m{user-name}\u001b[90m@\u001b[97m{host-name}"
     },
     {
       "type": "os",
-      "key": " :  OS",
-      "keyColor": "38;5;44"
+      "key": "\u001b[38;5;44m :  \u001b[22m\u001b[97mO\u001b[96mS",
+      "keyColor": "38;5;44",
+      "format": "\u001b[97m{name}{?codename} {codename}{?} \u001b[96m{version}{?build-id} \u001b[90m(\u001b[37m{build-id}\u001b[90m){?} \u001b[90m{arch}"
     },
     {
       "type": "host",
-      "key": " :  Host",
-      "keyColor": "38;5;44"
+      "key": "\u001b[38;5;44m :  \u001b[22m\u001b[97mH\u001b[96mo\u001b[36ms\u001b[90mt",
+      "keyColor": "38;5;44",
+      "format": "\u001b[97m{name}"
     },
     {
       "type": "kernel",
-      "key": " :  Kernel",
-      "keyColor": "38;5;44"
+      "key": "\u001b[38;5;44m :  \u001b[22m\u001b[97mK\u001b[96me\u001b[36mr\u001b[90mnel",
+      "keyColor": "38;5;44",
+      "format": "\u001b[97m{sysname} \u001b[96m{release}"
     },
     {
       "type": "uptime",
-      "key": " :  Uptime",
-      "keyColor": "38;5;44"
+      "key": "\u001b[38;5;44m :  \u001b[22m\u001b[97mU\u001b[96mp\u001b[36mt\u001b[90mime",
+      "keyColor": "38;5;44",
+      "format": "\u001b[96m{days}\u001b[37md \u001b[96m{hours}\u001b[37mh \u001b[96m{minutes}\u001b[37mm"
     },
     {
       "type": "shell",
-      "key": " :  Shell",
-      "keyColor": "38;5;44"
+      "key": "\u001b[38;5;44m :  \u001b[22m\u001b[97mS\u001b[96mh\u001b[36me\u001b[90mll",
+      "keyColor": "38;5;44",
+      "format": "\u001b[97m{pretty-name} \u001b[96m{version}"
     },
     {
       "type": "custom",
@@ -69,28 +92,33 @@
     },
     {
       "type": "cpu",
-      "key": " :  CPU",
-      "keyColor": "38;5;44"
+      "key": "\u001b[38;5;44m :  \u001b[22m\u001b[97mC\u001b[96mP\u001b[36mU",
+      "keyColor": "38;5;44",
+      "format": "\u001b[97m{name} \u001b[90m(\u001b[96m{cores-logical}\u001b[37m cores\u001b[90m){?freq-max} \u001b[90m@ \u001b[96m{freq-max}{?}"
     },
     {
       "type": "gpu",
-      "key": " :  GPU",
-      "keyColor": "38;5;44"
+      "key": "\u001b[38;5;44m :  \u001b[22m\u001b[97mG\u001b[96mP\u001b[36mU",
+      "keyColor": "38;5;44",
+      "format": "\u001b[97m{name}{?core-count} \u001b[90m(\u001b[96m{core-count}\u001b[37m cores\u001b[90m){?}{?frequency} \u001b[90m@ \u001b[96m{frequency}{?} \u001b[90m[\u001b[38;2;255;85;255m{type}\u001b[90m]"
     },
     {
       "type": "memory",
-      "key": " :  Memory",
-      "keyColor": "38;5;44"
+      "key": "\u001b[38;5;44m :  \u001b[22m\u001b[97mM\u001b[96me\u001b[36mm\u001b[90mory",
+      "keyColor": "38;5;44",
+      "format": "\u001b[97m{used} \u001b[34m/ \u001b[37m{total} \u001b[90m(\u001b[0m{percentage}\u001b[90m)"
     },
     {
       "type": "disk",
-      "key": " :  Disk",
-      "keyColor": "38;5;44"
+      "key": "\u001b[38;5;44m :  \u001b[22m\u001b[97mD\u001b[96mi\u001b[36ms\u001b[90mk",
+      "keyColor": "38;5;44",
+      "format": "\u001b[97m{name} \u001b[37m{size-used} \u001b[34m/ \u001b[37m{size-total} \u001b[90m(\u001b[0m{size-percentage}\u001b[90m) \u001b[90m{filesystem}"
     },
     {
       "type": "display",
-      "key": " :  Display",
-      "keyColor": "38;5;44"
+      "key": "\u001b[38;5;44m :  \u001b[22m\u001b[97mD\u001b[96mi\u001b[36ms\u001b[90mplay",
+      "keyColor": "38;5;44",
+      "format": "\u001b[96m{width}\u001b[34mx\u001b[96m{height} \u001b[90m@ \u001b[96m{refresh-rate}\u001b[37mHz \u001b[97m{inch}\" \u001b[90m[\u001b[38;2;255;85;255m{type}\u001b[90m]"
     },
     {
       "type": "custom",
@@ -98,13 +126,15 @@
     },
     {
       "type": "localip",
-      "key": " :  Local",
-      "keyColor": "38;5;44"
+      "key": "\u001b[38;5;44m :  \u001b[22m\u001b[97mL\u001b[96mo\u001b[36mc\u001b[90mal",
+      "keyColor": "38;5;44",
+      "format": "\u001b[97m{ipv4} \u001b[90m[\u001b[38;2;255;85;255m{ifname}\u001b[90m]"
     },
     {
       "type": "publicip",
-      "key": " :  Public",
-      "keyColor": "38;5;44"
+      "key": "\u001b[38;5;44m :  \u001b[22m\u001b[97mP\u001b[96mu\u001b[36mb\u001b[90mlic",
+      "keyColor": "38;5;44",
+      "format": "\u001b[97m{ip} \u001b[90m(\u001b[37m{location}\u001b[90m)"
     },
     "break"
   ]

@@ -398,15 +398,18 @@ test_boxfetch_draws_a_closed_box() {
     # border wide enough to be the info frame rather than any border at all.
     local report
     report=$(printf '%s\n' "$out" | LC_ALL=C awk '
-        { line = $0; gsub(/\033\[[0-9;]*m/, "", line) }
+        # Count columns the way boxfetch.sh does: drop colour codes and UTF-8
+        # continuation bytes, so a non-ASCII value is not miscounted as ragged.
+        { line = $0; gsub(/\033\[[0-9;]*m/, "", line); gsub(/[\200-\277]/, "", line) }
         !width && line ~ /\.-{20,}\.$/ { width = length(line); inbox = 1 }
         inbox {
             n++
             if (length(line) != width) ragged++
-            if (line ~ /`-{20,}\047$/) inbox = 0
+            if (line ~ /`-{20,}\047$/) { closed = 1; inbox = 0 }
         }
         END {
             if (!width) print "no info box border found"
+            else if (!closed) print "no bottom border found"
             else if (n < 5) print "too few box rows: " n
             else if (ragged) print ragged " of " n " box rows are not " width " wide"
             else print "ok " n " rows @ " width
@@ -416,6 +419,107 @@ test_boxfetch_draws_a_closed_box() {
         ok\ *) test_pass ;;
         *) test_fail "$report" ;;
     esac
+}
+
+# In a narrow terminal boxfetch wraps long values inside the box instead of
+# cutting them off, and drops the logo once it would squeeze the box. At every
+# width the output must fit the terminal, the frame must stay rectangular, and
+# no value text may be lost. The tagline box under the logo is 36 wide, so
+# the info frame is found by a border of 40+ dashes.
+test_boxfetch_wraps_to_fit() {
+    if ! command -v fastfetch >/dev/null 2>&1; then
+        test_skip "boxfetch wraps to fit narrow terminals" "fastfetch not installed"
+        return
+    fi
+    test_start "boxfetch wraps to fit narrow terminals"
+
+    # Every run must lay out the same data, or live values (uptime, memory,
+    # public IP) drift between runs and read as lost text. Render once, then
+    # put a fastfetch on PATH that replays that snapshot.
+    local snap full cols out report failure=""
+    snap=$(mktemp -d)
+    fastfetch --config "$PWD/fastfetch/config-boxed.jsonc" --logo none --pipe false \
+        >"$snap/info" 2>/dev/null
+    printf '#!/bin/sh\ncat "%s/info"\n' "$snap" >"$snap/fastfetch"
+    chmod +x "$snap/fastfetch"
+
+    full=$(PATH="$snap:$PATH" BOXFETCH_CONFIG="$PWD/fastfetch/config-boxed.jsonc" \
+           BOXFETCH_LOGO=/dev/null BOXFETCH_COLUMNS=0 \
+           bash "$PWD/fastfetch/boxfetch.sh" 2>&1 | LC_ALL=C sed 's/\x1b\[[0-9;]*m//g')
+    for cols in 100 90 70 60; do
+        out=$(PATH="$snap:$PATH" BOXFETCH_CONFIG="$PWD/fastfetch/config-boxed.jsonc" \
+              BOXFETCH_LOGO="$PWD/fastfetch/signalmine_60.txt" BOXFETCH_COLUMNS=$cols \
+              bash "$PWD/fastfetch/boxfetch.sh" 2>&1)
+        report=$(printf '%s\n' "$out" | LC_ALL=C awk -v cols="$cols" '
+            { line = $0; gsub(/\033\[[0-9;]*m/, "", line); gsub(/[\200-\277]/, "", line) }
+            length(line) > cols { over++ }
+            !width && line ~ /\.-{40,}\.$/ { width = length(line); inbox = 1 }
+            inbox {
+                if (length(line) != width) ragged++
+                if (line ~ /`-{40,}\047$/) { closed = 1; inbox = 0 }
+            }
+            END {
+                if (over) print over " rows wider than " cols
+                else if (!width) print "no info box border found"
+                else if (!closed) print "no bottom border found"
+                else if (ragged) print ragged " box rows ragged"
+                else print "ok"
+            }')
+        if [[ $report != ok ]]; then
+            failure="at $cols cols: $report"
+            break
+        fi
+        if [[ $out != *"Sapere Aude"* ]]; then
+            failure="at $cols cols the logo was dropped"
+            break
+        fi
+        # Every word of the unclipped output must still appear somewhere.
+        local words_full words_out lost
+        words_full=$(printf '%s\n' "$full" | tr -s ' :.`' '\n' | grep -E '[[:alnum:]]{4,}' | sort -u)
+        words_out=$(printf '%s\n' "$out" | LC_ALL=C sed 's/\x1b\[[0-9;]*m//g' | tr -s ' :.`' '\n' | sort -u)
+        lost=$(comm -23 <(printf '%s\n' "$words_full") <(printf '%s\n' "$words_out"))
+        if [[ -n $lost ]]; then
+            failure="at $cols cols text was lost: $(printf '%s\n' "$lost" | head -3 | tr '\n' ' ')"
+            break
+        fi
+    done
+    rm -rf "$snap"
+
+    if [[ -n $failure ]]; then
+        test_fail "$failure"
+    else
+        test_pass
+    fi
+}
+
+# dimdots.pl must recolour punctuation in the value column only: the logo is
+# drawn from dots, and the keys are split by per-letter colour codes, so a
+# filter keyed on the plain label text would silently match nothing.
+test_dimdots_dims_values_not_logo() {
+    if ! command -v perl >/dev/null 2>&1; then
+        test_skip "dimdots dims value punctuation only" "perl not installed"
+        return
+    fi
+    test_start "dimdots dims value punctuation only"
+
+    local e=$'\033' line out
+    line="..:== ${e}[38;5;44m :  ${e}[22m${e}[97mO${e}[96mS${e}[m  ${e}[96m26.5 (x), 75%"
+    out=$(printf '%s\n' "$line" | perl "$PWD/fastfetch/dimdots.pl")
+
+    if [[ $out != "..:== "* ]]; then
+        test_fail "logo dots were rewritten: $(printf '%s' "$out" | cat -v)"
+    elif [[ $out != *"26${e}[90m.${e}[96m5"* ]]; then
+        test_fail "value period not dimmed: $(printf '%s' "$out" | cat -v)"
+    else
+        local ch
+        for ch in '(' ')' ',' '%'; do
+            if [[ $out != *"${e}[90m${ch}"* ]]; then
+                test_fail "'$ch' not dimmed: $(printf '%s' "$out" | cat -v)"
+                return
+            fi
+        done
+        test_pass
+    fi
 }
 
 test_fastfetch_config_backed_up() {
@@ -448,7 +552,7 @@ test_shellcheck() {
     if true; then
         # install.sh sources lib/*.sh via a runtime-computed path; shellcheck
         # only resolves those cross-file globals when both are passed together.
-        if shellcheck install.sh lib/*.sh >/dev/null 2>&1; then
+        if shellcheck install.sh lib/*.sh fastfetch/boxfetch.sh >/dev/null 2>&1; then
             test_pass
         else
             test_fail "Shellcheck found warnings at default severity"
@@ -478,6 +582,8 @@ main() {
     test_no_neofetch_references
     test_fastfetch_configs_parse
     test_boxfetch_draws_a_closed_box
+    test_boxfetch_wraps_to_fit
+    test_dimdots_dims_values_not_logo
     test_shellcheck
 
     echo

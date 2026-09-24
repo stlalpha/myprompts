@@ -418,6 +418,57 @@ test_boxfetch_draws_a_closed_box() {
     esac
 }
 
+# In a narrow terminal boxfetch wraps long values inside the box instead of
+# cutting them off, and drops the logo once it would squeeze the box. At every
+# width the output must fit the terminal, the frame must stay rectangular, and
+# no value text may be lost. The tagline box under the logo is 36 wide, so
+# the info frame is found by a border of 40+ dashes.
+test_boxfetch_wraps_to_fit() {
+    if ! command -v fastfetch >/dev/null 2>&1; then
+        test_skip "boxfetch wraps to fit narrow terminals" "fastfetch not installed"
+        return
+    fi
+    test_start "boxfetch wraps to fit narrow terminals"
+
+    local full cols out report
+    full=$(BOXFETCH_CONFIG="$PWD/fastfetch/config-boxed.jsonc" \
+           BOXFETCH_LOGO=/dev/null BOXFETCH_COLUMNS=0 \
+           bash "$PWD/fastfetch/boxfetch.sh" 2>&1 | LC_ALL=C sed 's/\x1b\[[0-9;]*m//g')
+    for cols in 100 90 70 60; do
+        out=$(BOXFETCH_CONFIG="$PWD/fastfetch/config-boxed.jsonc" \
+              BOXFETCH_LOGO="$PWD/fastfetch/signalmine_60.txt" BOXFETCH_COLUMNS=$cols \
+              bash "$PWD/fastfetch/boxfetch.sh" 2>&1)
+        report=$(printf '%s\n' "$out" | LC_ALL=C awk -v cols="$cols" '
+            { line = $0; gsub(/\033\[[0-9;]*m/, "", line) }
+            length(line) > cols { over++ }
+            !width && line ~ /\.-{40,}\.$/ { width = length(line); inbox = 1 }
+            inbox { if (length(line) != width) ragged++; if (line ~ /`-{40,}\047$/) inbox = 0 }
+            END {
+                if (over) print over " rows wider than " cols
+                else if (!width) print "no info box border found"
+                else if (ragged) print ragged " box rows ragged"
+                else print "ok"
+            }')
+        if [[ $report != ok ]]; then
+            test_fail "at $cols cols: $report"
+            return
+        fi
+        if [[ $out != *"Sapere Aude"* ]]; then
+            test_fail "at $cols cols the logo was dropped"
+            return
+        fi
+        # Every word of the unclipped output must still appear somewhere.
+        local words_full words_out
+        words_full=$(printf '%s\n' "$full" | tr -s ' :.`' '\n' | grep -E '[[:alnum:]]{4,}' | sort -u)
+        words_out=$(printf '%s\n' "$out" | LC_ALL=C sed 's/\x1b\[[0-9;]*m//g' | tr -s ' :.`' '\n' | sort -u)
+        if [[ -n $(comm -23 <(printf '%s\n' "$words_full") <(printf '%s\n' "$words_out")) ]]; then
+            test_fail "at $cols cols text was lost: $(comm -23 <(printf '%s\n' "$words_full") <(printf '%s\n' "$words_out") | head -3 | tr '\n' ' ')"
+            return
+        fi
+    done
+    test_pass
+}
+
 # dimdots.pl must recolour punctuation in the value column only: the logo is
 # drawn from dots, and the keys are split by per-letter colour codes, so a
 # filter keyed on the plain label text would silently match nothing.
@@ -508,6 +559,7 @@ main() {
     test_no_neofetch_references
     test_fastfetch_configs_parse
     test_boxfetch_draws_a_closed_box
+    test_boxfetch_wraps_to_fit
     test_dimdots_dims_values_not_logo
     test_shellcheck
 

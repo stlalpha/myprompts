@@ -54,6 +54,19 @@ Themed shell prompt system with automated configuration and package installation
   runs fastfetch with `--logo none --pipe false`, measures the rendered width,
   draws all four edges to fit, then pastes the logo alongside. Exposed as the
   `sysinfo` alias; plain `fastfetch` still works and just shows the left rail.
+- boxfetch.sh never cuts value text: rows too long for the terminal wrap
+  inside the box, indented to the value column and resuming their colour.
+  Below `BOXFETCH_MIN_WIDTH` (48) of room beside the logo, the logo moves
+  above the box rather than being dropped.
+- The frame is drawn by boxfetch.sh with a corner glow: every edge fades from
+  each corner white -> bright cyan -> cyan -> bright blue -> blue -> dark grey.
+  The grey is 256-colour 238 (#444444), not SGR 90, because themes remap 90.
+  Each row's own ` :` rail from fastfetch is replaced by a faded one.
+- boxfetch.sh reads the width with `stty size </dev/tty`, not `tput cols`:
+  inside `$(...)` tput's stdout is a pipe, and with stderr silenced it has no
+  terminal to query and reports 80 whatever the real width is.
+- fastfetch detects the shell from its parent process, so boxfetch.sh sets
+  `FFTS_IGNORE_PARENT=1` to skip its own bash and report the user's shell.
 - The boxed layout styles values in the 16-colour 90s ANSI palette and fades
   each key white -> bright cyan -> cyan -> dark grey, one colour code per
   letter. Because the keys are split by escapes, anything matching on key

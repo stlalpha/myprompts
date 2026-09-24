@@ -371,6 +371,53 @@ test_fastfetch_configs_parse() {
     done
 }
 
+# The whole point of boxfetch.sh is the border fastfetch cannot draw: values
+# are variable length and fastfetch has no line-padding facility, so a right
+# rail is only possible by measuring the rendered output. Assert the frame is
+# actually rectangular -- every box row the same display width, closed at both
+# ends -- because a drift in the width maths shows up as a ragged right edge.
+test_boxfetch_draws_a_closed_box() {
+    # test_skip does not resolve a started test, so guard before test_start.
+    if ! command -v fastfetch >/dev/null 2>&1; then
+        test_skip "boxfetch draws a rectangular closed box" "fastfetch not installed"
+        return
+    fi
+    test_start "boxfetch draws a rectangular closed box"
+
+    local out
+    if ! out=$(BOXFETCH_CONFIG="$PWD/fastfetch/config-boxed.jsonc" \
+               BOXFETCH_LOGO="$PWD/fastfetch/signalmine_60.txt" \
+               BOXFETCH_COLUMNS=120 \
+               bash "$PWD/fastfetch/boxfetch.sh" 2>&1); then
+        test_fail "boxfetch exited non-zero: $(printf '%s' "$out" | head -3)"
+        return
+    fi
+
+    # Strip colour, then walk from the info box's top border to its bottom
+    # one. The logo carries its own small caption box, so key off the first
+    # border wide enough to be the info frame rather than any border at all.
+    local report
+    report=$(printf '%s\n' "$out" | LC_ALL=C awk '
+        { line = $0; gsub(/\033\[[0-9;]*m/, "", line) }
+        !width && line ~ /\.-{20,}\.$/ { width = length(line); inbox = 1 }
+        inbox {
+            n++
+            if (length(line) != width) ragged++
+            if (line ~ /`-{20,}\047$/) inbox = 0
+        }
+        END {
+            if (!width) print "no info box border found"
+            else if (n < 5) print "too few box rows: " n
+            else if (ragged) print ragged " of " n " box rows are not " width " wide"
+            else print "ok " n " rows @ " width
+        }')
+
+    case $report in
+        ok\ *) test_pass ;;
+        *) test_fail "$report" ;;
+    esac
+}
+
 test_fastfetch_config_backed_up() {
     test_start "install backs up a pre-existing fastfetch config"
     setup_test_env
@@ -430,6 +477,7 @@ main() {
     test_forged_token_does_not_authorise_deletion
     test_no_neofetch_references
     test_fastfetch_configs_parse
+    test_boxfetch_draws_a_closed_box
     test_shellcheck
 
     echo

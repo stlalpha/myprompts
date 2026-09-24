@@ -433,12 +433,21 @@ test_boxfetch_wraps_to_fit() {
     fi
     test_start "boxfetch wraps to fit narrow terminals"
 
-    local full cols out report
-    full=$(BOXFETCH_CONFIG="$PWD/fastfetch/config-boxed.jsonc" \
+    # Every run must lay out the same data, or live values (uptime, memory,
+    # public IP) drift between runs and read as lost text. Render once, then
+    # put a fastfetch on PATH that replays that snapshot.
+    local snap full cols out report failure=""
+    snap=$(mktemp -d)
+    fastfetch --config "$PWD/fastfetch/config-boxed.jsonc" --logo none --pipe false \
+        >"$snap/info" 2>/dev/null
+    printf '#!/bin/sh\ncat "%s/info"\n' "$snap" >"$snap/fastfetch"
+    chmod +x "$snap/fastfetch"
+
+    full=$(PATH="$snap:$PATH" BOXFETCH_CONFIG="$PWD/fastfetch/config-boxed.jsonc" \
            BOXFETCH_LOGO=/dev/null BOXFETCH_COLUMNS=0 \
            bash "$PWD/fastfetch/boxfetch.sh" 2>&1 | LC_ALL=C sed 's/\x1b\[[0-9;]*m//g')
     for cols in 100 90 70 60; do
-        out=$(BOXFETCH_CONFIG="$PWD/fastfetch/config-boxed.jsonc" \
+        out=$(PATH="$snap:$PATH" BOXFETCH_CONFIG="$PWD/fastfetch/config-boxed.jsonc" \
               BOXFETCH_LOGO="$PWD/fastfetch/signalmine_60.txt" BOXFETCH_COLUMNS=$cols \
               bash "$PWD/fastfetch/boxfetch.sh" 2>&1)
         report=$(printf '%s\n' "$out" | LC_ALL=C awk -v cols="$cols" '
@@ -457,23 +466,30 @@ test_boxfetch_wraps_to_fit() {
                 else print "ok"
             }')
         if [[ $report != ok ]]; then
-            test_fail "at $cols cols: $report"
-            return
+            failure="at $cols cols: $report"
+            break
         fi
         if [[ $out != *"Sapere Aude"* ]]; then
-            test_fail "at $cols cols the logo was dropped"
-            return
+            failure="at $cols cols the logo was dropped"
+            break
         fi
         # Every word of the unclipped output must still appear somewhere.
-        local words_full words_out
+        local words_full words_out lost
         words_full=$(printf '%s\n' "$full" | tr -s ' :.`' '\n' | grep -E '[[:alnum:]]{4,}' | sort -u)
         words_out=$(printf '%s\n' "$out" | LC_ALL=C sed 's/\x1b\[[0-9;]*m//g' | tr -s ' :.`' '\n' | sort -u)
-        if [[ -n $(comm -23 <(printf '%s\n' "$words_full") <(printf '%s\n' "$words_out")) ]]; then
-            test_fail "at $cols cols text was lost: $(comm -23 <(printf '%s\n' "$words_full") <(printf '%s\n' "$words_out") | head -3 | tr '\n' ' ')"
-            return
+        lost=$(comm -23 <(printf '%s\n' "$words_full") <(printf '%s\n' "$words_out"))
+        if [[ -n $lost ]]; then
+            failure="at $cols cols text was lost: $(printf '%s\n' "$lost" | head -3 | tr '\n' ' ')"
+            break
         fi
     done
-    test_pass
+    rm -rf "$snap"
+
+    if [[ -n $failure ]]; then
+        test_fail "$failure"
+    else
+        test_pass
+    fi
 }
 
 # dimdots.pl must recolour punctuation in the value column only: the logo is

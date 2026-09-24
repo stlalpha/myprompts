@@ -60,7 +60,7 @@
       "type": "os",
       "key": "\u001b[38;5;44m :  \u001b[22m\u001b[97mO\u001b[96mS",
       "keyColor": "38;5;44",
-      "format": "\u001b[97m{name} {codename} \u001b[96m{version} \u001b[90m(\u001b[37m{build-id}\u001b[90m) \u001b[90m{arch}"
+      "format": "\u001b[97m{name}{?codename} {codename}{?} \u001b[96m{version}{?build-id} \u001b[90m(\u001b[37m{build-id}\u001b[90m){?} \u001b[90m{arch}"
     },
     {
       "type": "host",
@@ -94,13 +94,13 @@
       "type": "cpu",
       "key": "\u001b[38;5;44m :  \u001b[22m\u001b[97mC\u001b[96mP\u001b[36mU",
       "keyColor": "38;5;44",
-      "format": "\u001b[97m{name} \u001b[90m(\u001b[96m{cores-logical}\u001b[37m cores\u001b[90m) \u001b[90m@ \u001b[96m{freq-max}"
+      "format": "\u001b[97m{name} \u001b[90m(\u001b[96m{cores-logical}\u001b[37m cores\u001b[90m){?freq-max} \u001b[90m@ \u001b[96m{freq-max}{?}"
     },
     {
       "type": "gpu",
       "key": "\u001b[38;5;44m :  \u001b[22m\u001b[97mG\u001b[96mP\u001b[36mU",
       "keyColor": "38;5;44",
-      "format": "\u001b[97m{name} \u001b[90m(\u001b[96m{core-count}\u001b[37m cores\u001b[90m) \u001b[90m@ \u001b[96m{frequency} \u001b[90m[\u001b[38;2;255;85;255m{type}\u001b[90m]"
+      "format": "\u001b[97m{name}{?core-count} \u001b[90m(\u001b[96m{core-count}\u001b[37m cores\u001b[90m){?}{?frequency} \u001b[90m@ \u001b[96m{frequency}{?} \u001b[90m[\u001b[38;2;255;85;255m{type}\u001b[90m]"
     },
     {
       "type": "memory",

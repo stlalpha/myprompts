@@ -54,8 +54,10 @@ Themed shell prompt system with automated configuration and package installation
   runs fastfetch with `--logo none --pipe false`, measures the rendered width,
   draws all four edges to fit, then pastes the logo alongside. Exposed as the
   `sysinfo` alias; plain `fastfetch` still works and just shows the left rail.
-- boxfetch.sh never cuts value text: rows too long for the terminal wrap
-  inside the box, indented to the value column and resuming their colour.
+- boxfetch.sh wraps rows too long for the terminal inside the box, indented
+  to the value column and resuming their colour. `wrap()` still clips in
+  three cases: a row with no recognised ` :  Key  ` column, a key wider than
+  the width less 12 columns, and a single word longer than the value column.
   Below `BOXFETCH_MIN_WIDTH` (48) of room beside the logo, the logo moves
   above the box rather than being dropped.
 - The frame is drawn by boxfetch.sh with a corner glow: every edge fades from

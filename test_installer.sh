@@ -398,15 +398,18 @@ test_boxfetch_draws_a_closed_box() {
     # border wide enough to be the info frame rather than any border at all.
     local report
     report=$(printf '%s\n' "$out" | LC_ALL=C awk '
-        { line = $0; gsub(/\033\[[0-9;]*m/, "", line) }
+        # Count columns the way boxfetch.sh does: drop colour codes and UTF-8
+        # continuation bytes, so a non-ASCII value is not miscounted as ragged.
+        { line = $0; gsub(/\033\[[0-9;]*m/, "", line); gsub(/[\200-\277]/, "", line) }
         !width && line ~ /\.-{20,}\.$/ { width = length(line); inbox = 1 }
         inbox {
             n++
             if (length(line) != width) ragged++
-            if (line ~ /`-{20,}\047$/) inbox = 0
+            if (line ~ /`-{20,}\047$/) { closed = 1; inbox = 0 }
         }
         END {
             if (!width) print "no info box border found"
+            else if (!closed) print "no bottom border found"
             else if (n < 5) print "too few box rows: " n
             else if (ragged) print ragged " of " n " box rows are not " width " wide"
             else print "ok " n " rows @ " width
@@ -439,13 +442,17 @@ test_boxfetch_wraps_to_fit() {
               BOXFETCH_LOGO="$PWD/fastfetch/signalmine_60.txt" BOXFETCH_COLUMNS=$cols \
               bash "$PWD/fastfetch/boxfetch.sh" 2>&1)
         report=$(printf '%s\n' "$out" | LC_ALL=C awk -v cols="$cols" '
-            { line = $0; gsub(/\033\[[0-9;]*m/, "", line) }
+            { line = $0; gsub(/\033\[[0-9;]*m/, "", line); gsub(/[\200-\277]/, "", line) }
             length(line) > cols { over++ }
             !width && line ~ /\.-{40,}\.$/ { width = length(line); inbox = 1 }
-            inbox { if (length(line) != width) ragged++; if (line ~ /`-{40,}\047$/) inbox = 0 }
+            inbox {
+                if (length(line) != width) ragged++
+                if (line ~ /`-{40,}\047$/) { closed = 1; inbox = 0 }
+            }
             END {
                 if (over) print over " rows wider than " cols
                 else if (!width) print "no info box border found"
+                else if (!closed) print "no bottom border found"
                 else if (ragged) print ragged " box rows ragged"
                 else print "ok"
             }')
@@ -529,7 +536,7 @@ test_shellcheck() {
     if true; then
         # install.sh sources lib/*.sh via a runtime-computed path; shellcheck
         # only resolves those cross-file globals when both are passed together.
-        if shellcheck install.sh lib/*.sh >/dev/null 2>&1; then
+        if shellcheck install.sh lib/*.sh fastfetch/boxfetch.sh >/dev/null 2>&1; then
             test_pass
         else
             test_fail "Shellcheck found warnings at default severity"

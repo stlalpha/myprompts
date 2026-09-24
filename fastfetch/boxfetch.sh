@@ -29,7 +29,9 @@ if ! command -v fastfetch >/dev/null 2>&1; then
     exit 1
 fi
 
-info=$(fastfetch --config "$BOX_CONFIG" --logo none --pipe false "$@")
+# fastfetch reports the shell as its parent process, which is this script's
+# bash; FFTS_IGNORE_PARENT makes it skip one level up to the user's shell.
+info=$(FFTS_IGNORE_PARENT=1 fastfetch --config "$BOX_CONFIG" --logo none --pipe false "$@")
 
 # Dim . , ( ) % inside values; fastfetch cannot colour characters within a
 # placeholder. Skipped when perl is absent -- the values keep their own colour.

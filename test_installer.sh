@@ -418,6 +418,36 @@ test_boxfetch_draws_a_closed_box() {
     esac
 }
 
+# dimdots.pl must recolour punctuation in the value column only: the logo is
+# drawn from dots, and the keys are split by per-letter colour codes, so a
+# filter keyed on the plain label text would silently match nothing.
+test_dimdots_dims_values_not_logo() {
+    if ! command -v perl >/dev/null 2>&1; then
+        test_skip "dimdots dims value punctuation only" "perl not installed"
+        return
+    fi
+    test_start "dimdots dims value punctuation only"
+
+    local e=$'\033' line out
+    line="..:== ${e}[38;5;44m :  ${e}[22m${e}[97mO${e}[96mS${e}[m  ${e}[96m26.5 (x), 75%"
+    out=$(printf '%s\n' "$line" | perl "$PWD/fastfetch/dimdots.pl")
+
+    if [[ $out != "..:== "* ]]; then
+        test_fail "logo dots were rewritten: $(printf '%s' "$out" | cat -v)"
+    elif [[ $out != *"26${e}[90m.${e}[96m5"* ]]; then
+        test_fail "value period not dimmed: $(printf '%s' "$out" | cat -v)"
+    else
+        local ch
+        for ch in '(' ')' ',' '%'; do
+            if [[ $out != *"${e}[90m${ch}"* ]]; then
+                test_fail "'$ch' not dimmed: $(printf '%s' "$out" | cat -v)"
+                return
+            fi
+        done
+        test_pass
+    fi
+}
+
 test_fastfetch_config_backed_up() {
     test_start "install backs up a pre-existing fastfetch config"
     setup_test_env
@@ -478,6 +508,7 @@ main() {
     test_no_neofetch_references
     test_fastfetch_configs_parse
     test_boxfetch_draws_a_closed_box
+    test_dimdots_dims_values_not_logo
     test_shellcheck
 
     echo

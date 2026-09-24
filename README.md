@@ -220,7 +220,7 @@ The installer writes a `fastfetch` config to `~/.config/fastfetch/config.jsonc`
 and the Signal Mine ASCII logo alongside it. Two layouts ship:
 
 - `vaporwave` (default) - colored `◆` keys with `【HARDWARE】` / `【NETWORK】` section headers
-- `boxed` - minimal cyan/teal layout inside a `.---.` border
+- `boxed` - cyan layout inside a `.---.` border, values styled in the 90s ANSI palette with faded keys (run it as `sysinfo`)
 
 Pick one non-interactively with `FASTFETCH_STYLE=boxed`. An existing config is
 moved to `config.jsonc.myprompts-backup` before the first overwrite, and

@@ -31,6 +31,13 @@ fi
 
 info=$(fastfetch --config "$BOX_CONFIG" --logo none --pipe false "$@")
 
+# Dim . , ( ) % inside values; fastfetch cannot colour characters within a
+# placeholder. Skipped when perl is absent -- the values keep their own colour.
+BOX_DIMDOTS=${BOXFETCH_DIMDOTS:-"$(dirname "${BASH_SOURCE[0]}")/dimdots.pl"}
+if [[ -f $BOX_DIMDOTS ]] && command -v perl >/dev/null 2>&1; then
+    info=$(perl "$BOX_DIMDOTS" <<<"$info")
+fi
+
 # LC_ALL=C keeps awk byte-based so the width maths is the same under BSD awk,
 # mawk and gawk; stripping UTF-8 continuation bytes turns bytes back into
 # columns for the non-ASCII values fastfetch sometimes reports.

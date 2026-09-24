@@ -54,6 +54,16 @@ Themed shell prompt system with automated configuration and package installation
   runs fastfetch with `--logo none --pipe false`, measures the rendered width,
   draws all four edges to fit, then pastes the logo alongside. Exposed as the
   `sysinfo` alias; plain `fastfetch` still works and just shows the left rail.
+- The boxed layout styles values in the 16-colour 90s ANSI palette and fades
+  each key white -> bright cyan -> cyan -> dark grey, one colour code per
+  letter. Because the keys are split by escapes, anything matching on key
+  text has to match across colour codes (see `fastfetch/dimdots.pl`).
+- `fastfetch/dimdots.pl` dims `. , ( ) %` inside values. Format strings colour
+  whole placeholders only, so `26.5` or `75%` cannot be split from config;
+  boxfetch.sh pipes through it after rendering and skips it without perl.
+- Accent magenta is 24-bit (`38;2;255;85;255`, VGA #FF55FF), not SGR 95:
+  terminal themes remap the ANSI magenta slots (the mcbros Ghostty theme
+  makes them orange).
 
 ### Homebrew on Linux
 - Opt-in via `MYPROMPTS_LINUX_BREW=1` or an interactive prompt; default is the
@@ -192,6 +202,7 @@ linux_paru_packages=(gnu-netcat YOUR_AUR_PACKAGE)
 - `vaporwave_lscolors`: Exported `LS_COLORS` table for file extension colorization
 - `vaporwave_ls_setup.sh`: Helper to wire LS colors (for manual sourcing, legacy)
 - `fastfetch/boxfetch.sh`: draws the closed box around fastfetch output (fastfetch cannot pad lines, so the frame must be measured after the fact)
+- `fastfetch/dimdots.pl`: dims `. , ( ) %` inside fastfetch values (boxfetch.sh pipes through it)
 - `tools/scale_ascii.py`: density-preserving downscaler for the ASCII logo
 - `ansible/playbook.yml`: Local package installation with conditional blocks per package manager
 - `config/packages.sh`: Platform-specific package definitions (Bash arrays)
